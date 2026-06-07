@@ -43,6 +43,8 @@ export type OverlayDemoProps = {
   float?: boolean
   className?: string
   demoRef?: Ref<OverlayDemoHandle>
+  initialMessages?: ChatMessage[]
+  defaultPanelMode?: PanelMode
 }
 
 const DEMO_TRANSCRIPT = [
@@ -72,8 +74,25 @@ const PROMPT_CHIPS = [
   { label: 'Recap', query: 'Give me a quick recap so far' },
 ]
 
+export const CLARIFI_INTRO_REPLY =
+  'Clarifi is an invisible AI co-pilot for meetings — real-time answers and perfect notes at your fingertips, without showing up on screen share. Join the waitlist for early access.'
+
+function isClarifiQuestion(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('what is clarifi') ||
+    lower.includes("what's clarifi") ||
+    lower.includes('what is on my screen') ||
+    lower.includes("what's on my screen") ||
+    lower.includes('on my screen')
+  )
+}
+
 function demoReply(message: string, screenOn: boolean): string {
   const lower = message.toLowerCase()
+  if (isClarifiQuestion(message)) {
+    return CLARIFI_INTRO_REPLY
+  }
   if (lower.includes('what should i say')) {
     return 'Try: "That\'s a fair concern — we\'ve helped teams like yours cut onboarding time by about 40%. Happy to show you how in a quick pilot."'
   }
@@ -84,9 +103,9 @@ function demoReply(message: string, screenOn: boolean): string {
     return '**So far:** They asked about rollout timing and CRM integration. You offered a Q1 pilot. Next, clarify decision-makers and confirm budget timing.'
   }
   if (screenOn) {
-    return 'Based on what\'s on your screen, the deck highlights three phases — I\'d anchor your answer on Phase 1 (pilot) and offer a concrete start date.'
+    return CLARIFI_INTRO_REPLY
   }
-  return 'Clarifi listens in real time and surfaces answers like this during your call. Download the Mac app to use live AI assist in your next meeting.'
+  return CLARIFI_INTRO_REPLY
 }
 
 function ScreenIcon() {
@@ -176,13 +195,15 @@ export function OverlayDemo({
   float = false,
   className = '',
   demoRef,
+  initialMessages = [],
+  defaultPanelMode = 'bar',
 }: OverlayDemoProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
 
-  const [panelMode, setPanelMode] = useState<PanelMode>('bar')
+  const [panelMode, setPanelMode] = useState<PanelMode>(defaultPanelMode)
   const [query, setQuery] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [thinking, setThinking] = useState(false)
   const [isRecording, setIsRecording] = useState(defaultRecording)
   const [screenOn, setScreenOn] = useState(defaultScreen)

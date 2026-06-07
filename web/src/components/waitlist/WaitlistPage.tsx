@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
-import { OverlayDemo } from '@/components/landing/OverlayDemo'
+import { CLARIFI_INTRO_REPLY, OverlayDemo } from '@/components/landing/OverlayDemo'
 import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
@@ -278,7 +278,16 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
         </div>
 
         <div className="landing-hero-widget-wrap">
-          <OverlayDemo size="lg" showQuickPrompts defaultScreen />
+          <OverlayDemo
+            size="lg"
+            showQuickPrompts
+            defaultScreen
+            defaultPanelMode="chat"
+            initialMessages={[
+              { role: 'user', content: 'What is Clarifi?' },
+              { role: 'assistant', content: CLARIFI_INTRO_REPLY, usedScreen: true },
+            ]}
+          />
         </div>
       </section>
 
