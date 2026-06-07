@@ -3,6 +3,7 @@ dist/
 dist-electron/
 release/
 *.dmg
+!web/public/downloads/*.dmg
 *.exe
 .env
 .env.local

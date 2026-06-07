@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SignOutButton } from '@clerk/nextjs'
 import { DesktopConnect } from '@/components/DesktopConnect'
+import { getMacDownloadUrl } from '@/lib/downloads'
 import { PLAN_LIMITS } from '@/lib/plans'
 import { getUsageStats } from '@/lib/usage'
 
@@ -15,6 +16,7 @@ export default async function Dashboard() {
   const limitLabel = Number.isFinite(stats.limit)
     ? `${stats.used} / ${stats.limit}`
     : `${stats.used} (unlimited)`
+  const macDownloadUrl = getMacDownloadUrl()
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -60,7 +62,8 @@ export default async function Dashboard() {
           </p>
           <div className="flex flex-wrap gap-3">
             <a
-              href="https://github.com/your-org/clarifi-desktop/releases"
+              href={macDownloadUrl}
+              download
               className="inline-block bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/90"
             >
               Download for macOS

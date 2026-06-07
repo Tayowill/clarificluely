@@ -21,8 +21,8 @@ export async function configureUpdater(): Promise<void> {
 
   autoUpdater.setFeedURL({
     provider: 'github',
-    owner: process.env.GH_UPDATE_OWNER ?? 'your-org',
-    repo: process.env.GH_UPDATE_REPO ?? 'my-app',
+    owner: process.env.GH_UPDATE_OWNER ?? 'Tayowill',
+    repo: process.env.GH_UPDATE_REPO ?? 'clarificluely',
   })
 
   autoUpdater.requestHeaders = {}

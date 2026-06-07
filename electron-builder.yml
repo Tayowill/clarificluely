@@ -1,19 +1,45 @@
-appId: com.myapp.desktop
-productName: MyApp
+appId: com.clarifi.desktop
+productName: Clarifi
+copyright: Copyright © 2026 Clarifi
 directories:
   output: release
+  buildResources: build
 files:
   - dist/**/*
   - dist-electron/**/*
+extraResources:
+  - from: resources/audio-capture-helper
+    to: audio-capture-helper
+    filter:
+      - "**/*"
 mac:
-  target: dmg
+  target:
+    - dmg
+    - zip
+  icon: build/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    CFBundleDisplayName: Clarifi
+    NSMicrophoneUsageDescription: Clarifi needs microphone access to transcribe your meetings in real time.
+    NSScreenCaptureUsageDescription: Clarifi needs screen recording access to capture system audio from meetings.
+    CFBundleURLTypes:
+      - CFBundleURLName: Clarifi Auth
+        CFBundleURLSchemes:
+          - clarifi
+publish:
+  provider: github
+  owner: Tayowill
+  repo: clarificluely
+dmg:
+  title: Clarifi
+  icon: build/icon.icns
 win:
   target: nsis
   icon: build/icon.ico
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  shortcutName: Clarifi
