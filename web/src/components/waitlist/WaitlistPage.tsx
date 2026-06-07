@@ -331,7 +331,7 @@ export function WaitlistPage() {
 
           <p className="waitlist-footer">
             Questions?{' '}
-            <a href="mailto:support@clarifi.app">support@clarifi.app</a>
+            <a href="mailto:tayowilliams23@gmail.com">tayowilliams23@gmail.com</a>
           </p>
         </div>
       </section>

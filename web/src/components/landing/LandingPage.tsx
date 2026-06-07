@@ -37,7 +37,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Can I talk to customer support?',
-    a: 'Reach us anytime at support@clarifi.app — we typically respond within 24 hours.',
+    a: 'Reach us anytime at tayowilliams23@gmail.com — we typically respond within 24 hours.',
   },
 ]
 
@@ -588,7 +588,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
             </div>
             <div className="landing-footer-col">
               <h4>Support</h4>
-              <a href="mailto:support@clarifi.app">Contact Us</a>
+              <a href="mailto:tayowilliams23@gmail.com">Contact Us</a>
               <Link href="/dashboard">Dashboard</Link>
             </div>
             <div className="landing-footer-col">
