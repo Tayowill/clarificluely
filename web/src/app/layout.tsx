@@ -1,6 +1,13 @@
 import { ClerkProvider } from '@clerk/nextjs'
+import { Inter } from 'next/font/google'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata = {
   title: 'Clarifi — AI Meeting Assistant',
@@ -29,7 +36,7 @@ export default function RootLayout({
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
     >
-      <html lang="en">
+      <html lang="en" className={inter.variable}>
         <body className="font-sans antialiased">{children}</body>
       </html>
     </ClerkProvider>

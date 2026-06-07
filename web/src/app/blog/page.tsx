@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import '../landing-blog.css'
 
@@ -38,16 +39,20 @@ export default function BlogPage() {
     <div className="blog-root">
       <nav className="blog-nav">
         <Link href="/" className="blog-logo">
-          <span className="blog-logo-icon">✦</span>
+          <span className="blog-logo-icon">
+            <Image src="/clarifi-logo.png" alt="Clarifi" width={22} height={22} />
+          </span>
           Clarifi
         </Link>
         <div className="blog-nav-links">
+          <Link href="/#how-it-works">How it works</Link>
           <Link href="/#undetectable">Undetectability</Link>
+          <Link href="/#pricing">Pricing</Link>
           <Link href="/blog">Blog</Link>
-          <Link href="/sign-in" className="blog-nav-signin">
-            Sign in
-          </Link>
         </div>
+        <Link href="/" className="blog-nav-cta">
+          Get for Mac
+        </Link>
       </nav>
 
       <header className="blog-header">
@@ -73,6 +78,9 @@ export default function BlogPage() {
       </div>
 
       <footer className="blog-footer">
+        <p style={{ color: 'rgba(255,255,255,0.45)', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+          AI that helps you, invisibly.
+        </p>
         <Link href="/">← Back to home</Link>
       </footer>
     </div>
