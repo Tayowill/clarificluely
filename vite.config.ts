@@ -17,6 +17,9 @@ export default defineConfig(({ mode }) => {
       electron([
         {
           entry: 'electron/main.ts',
+          onstart(args) {
+            args.startup()
+          },
           vite: {
             define: electronDefine,
             build: {
@@ -50,6 +53,7 @@ export default defineConfig(({ mode }) => {
         input: {
           main: 'index.html',
           overlay: 'overlay.html',
+          onboarding: 'onboarding.html',
         },
       },
     },

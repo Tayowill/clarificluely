@@ -1,3 +1,31 @@
+/** Light card for embedded desktop onboarding sign-in pane */
+export const clerkAppearanceEmbed = {
+  variables: {
+    colorBackground: '#f0f0f2',
+    colorInputBackground: '#ffffff',
+    colorInputText: '#111111',
+    colorText: '#111111',
+    colorTextSecondary: '#6b7280',
+    colorPrimary: '#2563eb',
+    colorDanger: '#dc2626',
+    borderRadius: '0.75rem',
+  },
+  elements: {
+    rootBox: 'mx-auto w-full',
+    card: 'bg-white border border-gray-200 shadow-sm',
+    headerTitle: 'text-gray-900',
+    headerSubtitle: 'text-gray-500',
+    socialButtonsBlockButton: 'bg-white border-gray-200 text-gray-900',
+    formButtonPrimary: 'bg-blue-600 text-white hover:bg-blue-700',
+    footerActionLink: 'text-blue-600 hover:text-blue-700',
+    identityPreviewText: 'text-gray-900',
+    identityPreviewEditButton: 'text-gray-500',
+    formFieldInput: 'bg-white border-gray-200 text-gray-900',
+    dividerLine: 'bg-gray-200',
+    dividerText: 'text-gray-400',
+  },
+}
+
 export const clerkAppearance = {
   variables: {
     colorBackground: '#141414',

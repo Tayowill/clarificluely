@@ -2,14 +2,73 @@
 // NEVER send API keys to the renderer via IPC.
 // Renderer sends prompts → main process calls API → main returns result.
 
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, ipcMain, shell } from 'electron'
+import {
+  getIsRecording,
+  processAudioChunk,
+  startRecording,
+  stopRecording,
+} from '../audio'
+import {
+  getOverlayWindow,
+  isContentProtectionEnabled,
+  isOverlayFollowEnabled,
+  setContentProtectionEnabled,
+  getOverlaySize,
+  setOverlayHeight,
+  setOverlayInteractive,
+  setOverlaySize,
+  toggleContentProtection,
+  toggleOverlayFollow,
+} from '../overlay'
+
+let screenContextEnabled = false
+import { chatWithMeetingContext, generateSuggestions, resetSuggestionState } from '../llm'
+import { captureScreenForContext } from '../screenCapture'
+import { startSystemAudio, stopSystemAudio } from '../systemAudio'
+import {
+  hideAuthPane,
+  showAuthPane,
+  syncAuthPaneBounds,
+} from '../onboardingAuthPane'
+import { completeOnboarding } from '../onboarding'
+import {
+  signalTutorialAction,
+  startTutorial,
+  stopTutorial,
+  type TutorialStep,
+} from '../onboardingTutorial'
+import { isOnboardingComplete } from '../onboardingState'
+import {
+  allPermissionsGranted,
+  getPermissionStatuses,
+  openPermissionSettings,
+  requestPermission,
+  type PermissionKind,
+} from '../permissions'
+import {
+  getBillingUrl,
+  getConnectPageUrl,
+  getSignInUrl,
+  isDevicePaired,
+} from '../deviceAuth'
+import { getClarifiApiUrl } from '../keys'
 import { getKey, saveKey } from '../store'
+import {
+  clearChatSessions,
+  deleteChatSession,
+  loadChatSessions,
+  saveChatSession,
+  type ChatSession,
+} from '../chatHistory'
+
+let transcriptLines: string[] = []
+let suggestionCounter = 0
 
 const MAX_STRING_LENGTH = 50_000
 const HTML_TAG_REGEX = /<[^>]*>/g
 
 const LLM_RATE_LIMIT = { max: 10, windowMs: 60_000 }
-const AUDIO_RATE_LIMIT = { max: 60, windowMs: 60_000 }
 
 type RateLimitBucket = {
   count: number
@@ -163,39 +222,241 @@ async function queryAnthropic(prompt: string, apiKey: string): Promise<unknown> 
   }
 }
 
-export function registerHandlers(mainWindow: BrowserWindow): void {
+async function updateSuggestionsForOverlay(
+  lines: string[],
+): Promise<void> {
+  suggestionCounter += 1
+  if (suggestionCounter % 3 !== 0) return
+
+  const suggestions = await generateSuggestions(lines)
+  const overlay = getOverlayWindow()
+  if (overlay && !overlay.isDestroyed() && suggestions.length > 0) {
+    overlay.webContents.send('suggestions:update', suggestions)
+  }
+}
+
+function handleTranscript(text: string): void {
+  transcriptLines.push(text)
+  if (transcriptLines.length > 20) {
+    transcriptLines = transcriptLines.slice(-20)
+  }
+
+  const overlay = getOverlayWindow()
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.webContents.send('transcript:update', transcriptLines)
+  }
+
+  void updateSuggestionsForOverlay(transcriptLines)
+}
+
+let handlersRegistered = false
+
+export function registerHandlers(mainWindow?: BrowserWindow | null): void {
+  if (handlersRegistered) return
+
   void mainWindow
 
-  ipcMain.handle('check-keys', () => {
-    return {
-      openai: process.env.OPENAI_API_KEY ? 'loaded' : 'missing',
-      anthropic: process.env.ANTHROPIC_API_KEY ? 'loaded' : 'missing',
+  ipcMain.handle('overlay:set-interactive', (_event, interactive: boolean) => {
+    setOverlayInteractive(interactive)
+  })
+
+  ipcMain.handle('overlay:set-height', (_event, height: number) => {
+    if (typeof height === 'number' && Number.isFinite(height)) {
+      setOverlayHeight(height)
+    }
+  })
+
+  ipcMain.handle(
+    'overlay:set-bounds',
+    (_event, bounds: {
+      width?: number
+      height?: number
+      x?: number
+      y?: number
+      persist?: boolean
+    }) => {
+      if (
+        bounds &&
+        typeof bounds.width === 'number' &&
+        Number.isFinite(bounds.width) &&
+        typeof bounds.height === 'number' &&
+        Number.isFinite(bounds.height)
+      ) {
+        setOverlaySize(
+          bounds.width,
+          bounds.height,
+          bounds.persist !== false,
+          bounds.x,
+          bounds.y,
+        )
+      }
+    },
+  )
+
+  ipcMain.handle('overlay:get-bounds', () => {
+    return getOverlaySize()
+  })
+
+  ipcMain.handle('chat:history-load', () => {
+    return { sessions: loadChatSessions() }
+  })
+
+  registerValidatedHandler(
+    'chat:history-save-session',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { session?: ChatSession }
+      if (!payload.session || typeof payload.session !== 'object') {
+        throw new Error('session is required')
+      }
+      const session = payload.session
+      if (typeof session.id !== 'string' || typeof session.title !== 'string') {
+        throw new Error('invalid session')
+      }
+      const sessions = saveChatSession(session)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'chat:history-delete-session',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      const sessions = deleteChatSession(payload.id)
+      return { sessions }
+    },
+  )
+
+  ipcMain.handle('chat:history-clear', () => {
+    const sessions = clearChatSessions()
+    return { sessions }
+  })
+
+  ipcMain.handle('overlay:toggle-follow', () => {
+    return { enabled: toggleOverlayFollow() }
+  })
+
+  ipcMain.handle('overlay:follow-status', () => {
+    return { enabled: isOverlayFollowEnabled() }
+  })
+
+  ipcMain.handle('overlay:toggle-protection', (_event, enabled?: boolean) => {
+    if (typeof enabled === 'boolean') {
+      setContentProtectionEnabled(enabled)
+    } else {
+      toggleContentProtection()
+    }
+    return { enabled: isContentProtectionEnabled() }
+  })
+
+  ipcMain.handle('overlay:protection-status', () => {
+    return { enabled: isContentProtectionEnabled() }
+  })
+
+  ipcMain.handle('screen:context-enabled', (_event, enabled?: boolean) => {
+    if (typeof enabled === 'boolean') {
+      screenContextEnabled = enabled
+    } else {
+      screenContextEnabled = !screenContextEnabled
+    }
+    return { enabled: screenContextEnabled }
+  })
+
+  ipcMain.handle('screen:context-status', () => {
+    return { enabled: screenContextEnabled }
+  })
+
+  ipcMain.handle('overlay:update-suggestions', (_event, suggestions: string[]) => {
+    const overlay = getOverlayWindow()
+    if (overlay) {
+      overlay.webContents.send('suggestions:update', suggestions)
     }
   })
 
   registerValidatedHandler('ping', {}, () => 'pong')
 
-  registerValidatedHandler(
-    'audio:start',
-    {
-      requiresInput: true,
-      rateLimitKey: 'audio',
-      rateLimit: AUDIO_RATE_LIMIT,
-    },
-    () => ({ status: 'audio_started' }),
-  )
+  ipcMain.handle('llm:suggest', async (_event, lines: string[]) => {
+    if (!Array.isArray(lines)) return []
+    return generateSuggestions(lines)
+  })
 
-  registerValidatedHandler(
-    'audio:stop',
-    { requiresInput: true },
-    () => ({ status: 'audio_stopped' }),
-  )
+  ipcMain.handle('audio:start', async () => {
+    transcriptLines = []
+    suggestionCounter = 0
+    resetSuggestionState()
+
+    const overlay = getOverlayWindow()
+    if (overlay && !overlay.isDestroyed()) {
+      overlay.webContents.send('transcript:update', [])
+      overlay.webContents.send('suggestions:update', [])
+    }
+
+    startRecording((text: string) => {
+      handleTranscript(text)
+    })
+
+    if (process.platform === 'darwin') {
+      startSystemAudio(async (wavBuffer: Buffer) => {
+        const base64 = wavBuffer.toString('base64')
+        const transcript = await processAudioChunk(base64)
+        if (transcript && transcript.length > 2) {
+          handleTranscript(transcript)
+        }
+      })
+    }
+
+    return { status: 'started' }
+  })
+
+  ipcMain.handle('audio:stop', async () => {
+    stopRecording()
+    stopSystemAudio()
+    return { status: 'stopped' }
+  })
+
+  ipcMain.handle('audio:status', () => {
+    return { isRecording: getIsRecording() }
+  })
+
+  ipcMain.handle('audio:chunk', async (_event, audioBase64: string) => {
+    const transcript = await processAudioChunk(audioBase64)
+    if (transcript && transcript.length > 2) {
+      handleTranscript(transcript)
+    }
+    return { status: 'ok' }
+  })
 
   registerValidatedHandler(
     'screen:capture',
     { requiresInput: true },
     () => ({ status: 'screen_capture_requested' }),
   )
+
+  registerValidatedHandler('auth:open-connect', {}, async () => {
+    const url = getConnectPageUrl()
+    await shell.openExternal(url)
+    return { ok: true, url }
+  })
+
+  registerValidatedHandler('auth:open-sign-in', {}, async () => {
+    const url = getSignInUrl()
+    await shell.openExternal(url)
+    return { ok: true, url }
+  })
+
+  registerValidatedHandler('auth:connection-status', {}, async () => {
+    const apiUrl = getClarifiApiUrl()
+    const connected = await isDevicePaired()
+    return {
+      connected,
+      hasApiUrl: Boolean(apiUrl),
+      connectUrl: getConnectPageUrl(),
+    }
+  })
 
   registerValidatedHandler(
     'auth:validate',
@@ -253,4 +514,181 @@ export function registerHandlers(mainWindow: BrowserWindow): void {
       return { error: 'unsupported_provider' }
     },
   )
+
+  registerValidatedHandler(
+    'llm:chat',
+    {
+      requiresInput: true,
+      rateLimitKey: 'llm:chat',
+      rateLimit: LLM_RATE_LIMIT,
+    },
+    async (data) => {
+      const payload = data as {
+        message?: string
+        transcriptLines?: string[]
+        useScreenContext?: boolean
+      }
+
+      if (!payload.message || typeof payload.message !== 'string') {
+        throw new Error('message is required')
+      }
+
+      const lines = Array.isArray(payload.transcriptLines)
+        ? payload.transcriptLines.filter((line): line is string => typeof line === 'string')
+        : []
+
+      const useScreenContext = Boolean(payload.useScreenContext)
+      let screenImage:
+        | { imageBase64: string; mimeType: 'image/png' }
+        | undefined
+
+      if (useScreenContext) {
+        const capture = await captureScreenForContext()
+        if ('error' in capture) {
+          return { error: capture.error }
+        }
+        screenImage = {
+          imageBase64: capture.imageBase64,
+          mimeType: capture.mimeType,
+        }
+      }
+
+      return chatWithMeetingContext({
+        message: payload.message,
+        transcriptLines: lines,
+        useScreenContext,
+        screenImage,
+      })
+    },
+  )
+
+  registerValidatedHandler('onboarding:status', {}, async () => {
+    const complete = await isOnboardingComplete()
+    return { complete }
+  })
+
+  registerValidatedHandler('onboarding:complete', {}, async () => {
+    await completeOnboarding()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('onboarding:get-sign-in-url', {}, () => {
+    return { url: getSignInUrl() }
+  })
+
+  registerValidatedHandler('onboarding:auth-pane-show', {}, () => {
+    showAuthPane()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('onboarding:auth-pane-hide', {}, () => {
+    hideAuthPane()
+    return { ok: true }
+  })
+
+  registerValidatedHandler(
+    'onboarding:auth-pane-sync',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { x?: number; y?: number; width?: number; height?: number }
+      if (
+        typeof payload.x !== 'number' ||
+        typeof payload.y !== 'number' ||
+        typeof payload.width !== 'number' ||
+        typeof payload.height !== 'number'
+      ) {
+        throw new Error('invalid auth pane bounds')
+      }
+      syncAuthPaneBounds({
+        x: payload.x,
+        y: payload.y,
+        width: payload.width,
+        height: payload.height,
+      })
+      return { ok: true }
+    },
+  )
+
+  registerValidatedHandler('onboarding:get-billing-url', {}, () => {
+    return { url: getBillingUrl() }
+  })
+
+  registerValidatedHandler('onboarding:open-billing', {}, async () => {
+    const url = getBillingUrl()
+    await shell.openExternal(url)
+    return { ok: true, url }
+  })
+
+  registerValidatedHandler(
+    'onboarding:start-tutorial',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { step?: TutorialStep }
+      const step = payload.step
+      if (!step || !['enter', 'move', 'listen', 'stealth'].includes(step)) {
+        throw new Error('invalid tutorial step')
+      }
+      startTutorial(step)
+      return { ok: true, step }
+    },
+  )
+
+  registerValidatedHandler('onboarding:stop-tutorial', {}, () => {
+    stopTutorial()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('permissions:status', {}, () => {
+    const statuses = getPermissionStatuses()
+    return {
+      ...statuses,
+      allGranted: allPermissionsGranted(statuses),
+    }
+  })
+
+  registerValidatedHandler(
+    'permissions:request',
+    { requiresInput: true },
+    async (data) => {
+      const payload = data as { kind?: PermissionKind }
+      if (!payload.kind) {
+        throw new Error('kind is required')
+      }
+      const granted = await requestPermission(payload.kind)
+      const statuses = getPermissionStatuses()
+      return {
+        granted,
+        ...statuses,
+        allGranted: allPermissionsGranted(statuses),
+      }
+    },
+  )
+
+  registerValidatedHandler(
+    'permissions:open-settings',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { kind?: PermissionKind }
+      if (!payload.kind) {
+        throw new Error('kind is required')
+      }
+      openPermissionSettings(payload.kind)
+      return { ok: true }
+    },
+  )
+
+  registerValidatedHandler(
+    'onboarding:tutorial-signal',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { type?: TutorialStep }
+      if (!payload.type || !['enter', 'move', 'listen', 'stealth'].includes(payload.type)) {
+        throw new Error('invalid tutorial signal')
+      }
+      signalTutorialAction(payload.type)
+      return { ok: true }
+    },
+  )
+
+  handlersRegistered = true
 }

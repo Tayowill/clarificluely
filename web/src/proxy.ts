@@ -7,6 +7,8 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/sso-callback(.*)',
   '/desktop/connect(.*)',
+  '/desktop/sign-in(.*)',
+  '/desktop/sign-up(.*)',
   '/api/desktop/exchange',
   '/api/desktop/status',
   '/api/llm/chat',

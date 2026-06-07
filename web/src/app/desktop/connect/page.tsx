@@ -49,7 +49,7 @@ export default function DesktopConnectPage() {
       <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 px-8">
         <h1 className="text-2xl font-bold">Sign in to connect Clarifi Desktop</h1>
         <Link
-          href="/sign-in?redirect_url=/desktop/connect"
+          href="/desktop/sign-in"
           className="bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/90"
         >
           Sign in

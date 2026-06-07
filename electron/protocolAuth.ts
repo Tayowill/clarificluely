@@ -24,6 +24,18 @@ export function getConnectPageUrl(): string {
   return `${base.replace(/\/$/, '')}/desktop/connect`
 }
 
+export function getSignInUrl(): string {
+  const base = getClarifiApiUrl()
+  if (!base) return 'http://localhost:3000/desktop/sign-in'
+  return `${base.replace(/\/$/, '')}/desktop/sign-in`
+}
+
+export function getBillingUrl(): string {
+  const base = getClarifiApiUrl()
+  if (!base) return 'http://localhost:3000/billing'
+  return `${base.replace(/\/$/, '')}/billing`
+}
+
 function parseAuthToken(url: string): string | null {
   try {
     const parsed = new URL(url)

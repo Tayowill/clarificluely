@@ -1,17 +1,26 @@
 import * as path from 'path'
 
-import { app, BrowserWindow, globalShortcut, systemPreferences } from 'electron'
+import { app, BrowserWindow, globalShortcut } from 'electron'
 import { exchangeAuthToken } from './deviceAuth'
 import { registerHandlers } from './ipc/handlers'
 import { loadRuntimeEnv } from './keys'
+import {
+  createOnboardingWindow,
+  notifyOnboardingAuthConnected,
+} from './onboarding'
+import { isOnboardingComplete } from './onboardingState'
 import { queueAuthUrl, takePendingAuthUrl } from './protocolAuth'
 import { checkForSignedUpdates, configureUpdater } from './updater'
 import {
   createOverlayWindow,
+  destroyOverlayWindow,
   getOverlayWindow,
   toggleOverlayVisibility,
 } from './overlay'
 import { stopOverlayFollow } from './overlayPosition'
+
+// Show "Clarifi" in the menu bar instead of "Electron" during local dev.
+app.setName('Clarifi')
 
 // Best-effort: helps setContentProtection on older macOS capture paths (may not affect ScreenCaptureKit/Meet)
 if (process.platform === 'darwin') {
@@ -20,6 +29,7 @@ if (process.platform === 'darwin') {
 
 const isDev = !app.isPackaged
 const PROTOCOL = 'clarifi'
+const useDevShell = isDev && process.env.CLARIFI_DEV_SHELL === '1'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -27,6 +37,7 @@ async function handleAuthDeepLink(url: string): Promise<void> {
   const result = await exchangeAuthToken(url)
   if (result.ok) {
     console.log('Desktop connected via web auth')
+    notifyOnboardingAuthConnected()
   } else {
     console.error('Desktop auth exchange failed:', result.error)
   }
@@ -67,16 +78,18 @@ if (!gotLock) {
   })
 }
 
-function createWindow(): BrowserWindow {
+/** Optional legacy dev shell (index.html / MyApp). Off by default — overlay only. */
+function createDevShellWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: 'Clarifi Dev',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webSecurity: !isDev,
+      webSecurity: false,
       allowRunningInsecureContent: false,
     },
   })
@@ -88,27 +101,10 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  mainWindow.webContents.openDevTools()
 
-  if (!isDev) {
-    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.openai.com https://api.anthropic.com; media-src 'self'; object-src 'none';",
-          ],
-        },
-      })
-    })
-  }
-
-  if (isDev) {
-    mainWindow.webContents.openDevTools()
-    const devServerUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173'
-    mainWindow.loadURL(devServerUrl)
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
-  }
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173'
+  mainWindow.loadURL(devServerUrl)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -126,6 +122,22 @@ async function initializeStorage(): Promise<void> {
   }
 }
 
+async function launchClarifi(): Promise<void> {
+  const onboardingDone = await isOnboardingComplete()
+
+  if (!onboardingDone) {
+    destroyOverlayWindow()
+    createOnboardingWindow()
+    return
+  }
+
+  if (useDevShell) {
+    createDevShellWindow()
+  }
+
+  createOverlayWindow()
+}
+
 app.whenReady().then(async () => {
   loadRuntimeEnv()
   registerProtocolClient()
@@ -138,27 +150,11 @@ app.whenReady().then(async () => {
     if (authArg) await handleAuthDeepLink(authArg)
   }
 
-  if (process.platform === 'darwin') {
-    const micStatus = systemPreferences.getMediaAccessStatus('microphone')
-    if (micStatus !== 'granted') {
-      await systemPreferences.askForMediaAccess('microphone')
-    }
-  }
-
   await configureUpdater()
   await initializeStorage()
 
   registerHandlers()
-
-  if (isDev) {
-    const window = createWindow()
-    window.webContents.once('did-finish-load', () => {
-      createOverlayWindow()
-    })
-  } else {
-    // Production: overlay only (no "MyApp" dev shell window).
-    createOverlayWindow()
-  }
+  await launchClarifi()
 
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
     toggleOverlayVisibility()
@@ -180,12 +176,17 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('activate', () => {
-  if (isDev) {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
-    }
+app.on('activate', async () => {
+  const onboardingDone = await isOnboardingComplete()
+
+  if (!onboardingDone) {
+    destroyOverlayWindow()
+    createOnboardingWindow()
     return
+  }
+
+  if (useDevShell && BrowserWindow.getAllWindows().length === 0) {
+    createDevShellWindow()
   }
 
   const overlay = getOverlayWindow()

@@ -1,19 +1,66 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-const ALLOWED_CHANNELS = [
+const INVOKE_CHANNELS = [
   'ping',
-  'check-keys',
   'audio:start',
   'audio:stop',
+  'audio:chunk',
   'screen:capture',
+  'screen:context-enabled',
+  'screen:context-status',
   'llm:query',
+  'llm:suggest',
+  'llm:chat',
   'auth:validate',
+  'auth:open-connect',
+  'auth:open-sign-in',
+  'auth:connection-status',
+  'overlay:set-interactive',
+  'overlay:set-height',
+  'overlay:set-bounds',
+  'overlay:get-bounds',
+  'overlay:toggle-follow',
+  'overlay:follow-status',
+  'overlay:toggle-protection',
+  'overlay:protection-status',
+  'overlay:update-suggestions',
+  'audio:status',
+  'chat:history-load',
+  'chat:history-save-session',
+  'chat:history-delete-session',
+  'chat:history-clear',
+  'onboarding:status',
+  'onboarding:complete',
+  'onboarding:get-sign-in-url',
+  'onboarding:auth-pane-show',
+  'onboarding:auth-pane-hide',
+  'onboarding:auth-pane-sync',
+  'onboarding:get-billing-url',
+  'onboarding:open-billing',
+  'onboarding:start-tutorial',
+  'onboarding:stop-tutorial',
+  'onboarding:tutorial-signal',
+  'permissions:status',
+  'permissions:request',
+  'permissions:open-settings',
 ] as const
 
-type AllowedChannel = (typeof ALLOWED_CHANNELS)[number]
+const EVENT_CHANNELS = [
+  'suggestions:update',
+  'transcript:update',
+  'onboarding:tutorial-event',
+  'onboarding:auth-connected',
+  'onboarding:mock-nudge',
+] as const
+
+type InvokeChannel = (typeof INVOKE_CHANNELS)[number]
+type EventChannel = (typeof EVENT_CHANNELS)[number]
+type AllowedChannel = InvokeChannel | EventChannel
+
+const ALL_CHANNELS: readonly string[] = [...INVOKE_CHANNELS, ...EVENT_CHANNELS]
 
 function assertAllowedChannel(channel: string): asserts channel is AllowedChannel {
-  if (!(ALLOWED_CHANNELS as readonly string[]).includes(channel)) {
+  if (!ALL_CHANNELS.includes(channel)) {
     throw new Error(`Channel "${channel}" is not allowed`)
   }
 }
