@@ -12,6 +12,7 @@ extraResources:
     to: audio-capture-helper
     filter:
       - "**/*"
+afterSign: scripts/notarize.cjs
 mac:
   target:
     - dmg
@@ -19,6 +20,7 @@ mac:
   icon: build/icon.icns
   category: public.app-category.productivity
   hardenedRuntime: true
+  gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:

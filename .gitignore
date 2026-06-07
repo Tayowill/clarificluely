@@ -8,5 +8,6 @@ release/
 .env
 .env.local
 .env.*.local
+.env.signing.local
 .DS_Store
 *.log
