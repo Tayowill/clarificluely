@@ -5,11 +5,14 @@ import { fileURLToPath } from 'url'
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 const nextConfig: NextConfig = {
-  // Prevent Next from picking up /Users/tschool/package-lock.json as the workspace root
-  outputFileTracingRoot: projectRoot,
-  turbopack: {
-    root: projectRoot,
-  },
+  // Local only: pin workspace root so Next doesn't pick up a parent package-lock.json.
+  // On Vercel this breaks output tracing (ENOENT on .next/package.json).
+  ...(!process.env.VERCEL
+    ? {
+        outputFileTracingRoot: projectRoot,
+        turbopack: { root: projectRoot },
+      }
+    : {}),
 }
 
 export default nextConfig
