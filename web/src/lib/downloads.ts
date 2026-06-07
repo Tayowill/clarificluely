@@ -1,4 +1,4 @@
-const DEFAULT_APP_URL = 'https://clarificluely-cagr.vercel.app'
+const DEFAULT_APP_URL = 'https://www.clarifiapp.com'
 const MAC_DMG_FILENAME = 'Clarifi-0.1.0-arm64.dmg'
 
 export function getMacDownloadUrl(): string {

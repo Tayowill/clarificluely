@@ -9,6 +9,7 @@ import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
 import { fireWaitlistConfetti } from '@/lib/waitlist-confetti'
+import { authCallbackUrl } from '@/lib/site-url'
 import '@/components/landing/landing.css'
 import './waitlist.css'
 
@@ -68,9 +69,11 @@ function JoinWaitlistButton({
 
 type WaitlistPageProps = {
   supabaseConfig: SupabasePublicConfig | null
+  siteOrigin?: string
 }
 
-export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
+export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) {
+  const oauthRedirectTo = authCallbackUrl(siteOrigin)
   const router = useRouter()
   const [activeConfig, setActiveConfig] = useState<SupabasePublicConfig | null>(supabaseConfig)
   const [configChecked, setConfigChecked] = useState(supabaseConfig !== null)
@@ -197,12 +200,10 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
       setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
       return
     }
-    const redirectTo = `${window.location.origin}/auth/callback?next=/`
-
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
-        emailRedirectTo: redirectTo,
+        emailRedirectTo: oauthRedirectTo,
         shouldCreateUser: true,
       },
     })
@@ -230,7 +231,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        redirectTo: oauthRedirectTo,
       },
     })
 

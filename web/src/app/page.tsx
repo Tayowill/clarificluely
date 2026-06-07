@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
 import { getSupabaseEnv } from '@/lib/supabase/env'
+import { getSiteOrigin } from '@/lib/site-url'
 
 type HomeProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -23,7 +24,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <Suspense fallback={null}>
-      <WaitlistPage supabaseConfig={supabaseConfig} />
+      <WaitlistPage supabaseConfig={supabaseConfig} siteOrigin={getSiteOrigin()} />
     </Suspense>
   )
 }

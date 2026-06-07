@@ -1,19 +1,16 @@
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseEnv } from '@/lib/supabase/env'
+import { getSiteOrigin } from '@/lib/site-url'
 import { joinWaitlist } from '@/lib/waitlist'
 
 export const dynamic = 'force-dynamic'
 
-function redirectAfterAuth(request: Request, path: string) {
-  const { origin } = new URL(request.url)
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const isLocal = process.env.NODE_ENV === 'development'
-
-  if (!isLocal && forwardedHost) {
-    return NextResponse.redirect(`https://${forwardedHost}${path}`)
-  }
-  return NextResponse.redirect(`${origin}${path}`)
+function redirectTo(request: Request, path: string) {
+  const siteOrigin = getSiteOrigin(new URL(request.url).origin)
+  return NextResponse.redirect(`${siteOrigin}${path}`)
 }
 
 export async function GET(request: Request) {
@@ -21,19 +18,50 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
   const safeNext = next.startsWith('/') ? next : '/'
+  const env = getSupabaseEnv()
 
-  if (!code) {
-    return redirectAfterAuth(request, '/?error=auth')
+  if (!code || !env) {
+    return redirectTo(request, '/?error=auth')
   }
 
-  const supabase = await createClient()
-  if (!supabase) {
-    return redirectAfterAuth(request, '/?error=config')
-  }
+  const cookieStore = await cookies()
+  const successPath = `${safeNext}?joined=1`
+  let response = redirectTo(request, successPath)
+
+  const supabase = createServerClient(env.url, env.key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options)
+        })
+      },
+    },
+  })
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
+
   if (error) {
-    return redirectAfterAuth(request, '/?error=auth')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user?.email) {
+      const admin = getSupabaseAdmin()
+      if (admin) {
+        await admin.from('waitlist_signups').upsert(
+          { user_id: user.id, email: user.email },
+          { onConflict: 'user_id' },
+        )
+      } else {
+        await joinWaitlist(supabase)
+      }
+      return response
+    }
+
+    return redirectTo(request, '/?error=auth')
   }
 
   const {
@@ -41,7 +69,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user?.email) {
-    return redirectAfterAuth(request, '/?error=auth')
+    return redirectTo(request, '/?error=auth')
   }
 
   const admin = getSupabaseAdmin()
@@ -51,14 +79,14 @@ export async function GET(request: Request) {
       { onConflict: 'user_id' },
     )
     if (insertError) {
-      return redirectAfterAuth(request, '/?error=waitlist')
+      return redirectTo(request, '/?error=waitlist')
     }
   } else {
     const result = await joinWaitlist(supabase)
     if (!result.ok) {
-      return redirectAfterAuth(request, '/?error=waitlist')
+      return redirectTo(request, '/?error=waitlist')
     }
   }
 
-  return redirectAfterAuth(request, `${safeNext}?joined=1`)
+  return response
 }

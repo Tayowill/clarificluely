@@ -1,6 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
+import { updateSupabaseSession } from '@/lib/supabase/middleware'
+import { getSiteOrigin } from '@/lib/site-url'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -23,16 +25,22 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, request) => {
   const { pathname, searchParams } = request.nextUrl
+
   if (pathname === '/' && searchParams.get('code')) {
     const target = authCallbackRedirectPath(searchParams)
     if (target) {
-      return NextResponse.redirect(new URL(target, request.nextUrl.origin))
+      const siteOrigin = getSiteOrigin(request.nextUrl.origin)
+      return NextResponse.redirect(new URL(target, siteOrigin))
     }
   }
+
+  const supabaseResponse = await updateSupabaseSession(request)
 
   if (!isPublicRoute(request)) {
     await auth.protect()
   }
+
+  return supabaseResponse
 })
 
 export const config = {
