@@ -76,7 +76,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
   const signupEnabled = activeConfig !== null
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
-  const [countdown, setCountdown] = useState(getLaunchCountdown())
+  const [countdown, setCountdown] = useState<ReturnType<typeof getLaunchCountdown> | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'email_sent' | 'joined' | 'error'>(
     'idle',
   )
@@ -100,6 +100,16 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    if (!configChecked) return
+
+    if (searchParams.get('error') === 'config' && signupEnabled) {
+      router.replace('/')
+      setStatus('idle')
+      setMessage('')
+    }
+  }, [configChecked, signupEnabled, searchParams, router])
 
   useEffect(() => {
     void fetch('/api/waitlist/count')
@@ -154,10 +164,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
       return
     }
     if (searchParams.get('error') === 'config') {
-      if (signupEnabled) {
-        router.replace('/')
-        return
-      }
+      if (!configChecked || signupEnabled) return
       setStatus('error')
       setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
       scrollToJoin()
@@ -179,7 +186,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
         void completeJoin()
       }
     })
-  }, [searchParams, completeJoin, scrollToJoin, signupEnabled, activeConfig, router])
+  }, [searchParams, completeJoin, scrollToJoin, signupEnabled, activeConfig, configChecked])
 
   const handleEmailJoin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -284,7 +291,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
         <div className="waitlist-join-inner">
           <p className="waitlist-eyebrow">Launching soon</p>
 
-          {countdown.isLive ? (
+          {countdown?.isLive ? (
             <p className="waitlist-launch-date">
               <strong>We&apos;re live.</strong> Check your email for next steps.
             </p>
@@ -292,15 +299,24 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
             <>
               <div className="waitlist-countdown" aria-live="polite">
                 {(
-                  [
-                    ['days', countdown.days],
-                    ['hours', countdown.hours],
-                    ['minutes', countdown.minutes],
-                    ['seconds', countdown.seconds],
-                  ] as const
+                  countdown
+                    ? ([
+                        ['days', countdown.days],
+                        ['hours', countdown.hours],
+                        ['minutes', countdown.minutes],
+                        ['seconds', countdown.seconds],
+                      ] as const)
+                    : ([
+                        ['days', 0],
+                        ['hours', 0],
+                        ['minutes', 0],
+                        ['seconds', 0],
+                      ] as const)
                 ).map(([label, value]) => (
                   <div key={label} className="waitlist-unit">
-                    <span className="waitlist-unit-value">{pad(value)}</span>
+                    <span className="waitlist-unit-value" suppressHydrationWarning>
+                      {countdown ? pad(value) : '--'}
+                    </span>
                     <span className="waitlist-unit-label">{label}</span>
                   </div>
                 ))}
@@ -357,7 +373,7 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
             </div>
           )}
 
-          {message && (
+          {message && !(searchParams.get('error') === 'config' && signupEnabled) && (
             <p
               className={`waitlist-status ${
                 status === 'error' ? 'error' : status === 'email_sent' ? 'info' : 'success'
