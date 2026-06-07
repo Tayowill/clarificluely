@@ -1,0 +1,296 @@
+/* Two identical full-width scenes stacked; reveal layer clips at divider */
+
+.ssc-root {
+  width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ssc-scene {
+  position: relative;
+  height: 248px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #e8edf5 0%, #dce4f0 55%, #d4dce8 100%);
+  touch-action: none;
+}
+
+/* Labels stay fixed */
+.ssc-label {
+  position: absolute;
+  top: 10px;
+  z-index: 20;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  background: rgba(28, 28, 36, 0.9);
+  color: #fff;
+  pointer-events: none;
+}
+
+.ssc-label-left { left: 10px; }
+.ssc-label-right { right: 10px; }
+
+/* Both layers fill the scene */
+.ssc-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.ssc-layer-base {
+  z-index: 1;
+}
+
+.ssc-layer-reveal {
+  z-index: 2;
+  overflow: hidden;
+  border-right: 2px solid #fff;
+}
+
+.ssc-layer-reveal-inner {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+}
+
+.ssc-reveal-frame {
+  position: absolute;
+  inset: 0;
+  border-top: 3px solid #22c55e;
+  border-left: 3px solid #22c55e;
+  border-radius: 14px 0 0 14px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Shared composition — same in both layers */
+.ssc-compose {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 38px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ssc-assist-slot {
+  flex-shrink: 0;
+  min-height: 58px;
+}
+
+.ssc-assist-spacer {
+  height: 58px;
+}
+
+.ssc-assist {
+  background: #fff;
+  border-radius: 10px;
+  padding: 9px 11px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.ssc-assist-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 5px;
+}
+
+.ssc-assist-spark {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.ssc-assist p {
+  margin: 0;
+  font-size: 9.5px;
+  line-height: 1.45;
+  color: #374151;
+}
+
+.ssc-assist code {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 9px;
+  background: #e8f0fe;
+  color: #1d4ed8;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.ssc-ide {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.ssc-ide-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #ececf1;
+  border-bottom: 1px solid #d8d8de;
+  flex-shrink: 0;
+}
+
+.ssc-traffic {
+  display: flex;
+  gap: 4px;
+}
+
+.ssc-traffic span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ssc-traffic .r { background: #ff5f57; }
+.ssc-traffic .y { background: #febc2e; }
+.ssc-traffic .g { background: #28c840; }
+
+.ssc-ide-nav {
+  font-size: 10px;
+  color: #9ca3af;
+  letter-spacing: 2px;
+}
+
+.ssc-ide-tab {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid #d8d8de;
+  border-radius: 5px;
+  padding: 3px 8px;
+}
+
+.ssc-ide-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: #1e1e2e;
+}
+
+.ssc-ide-rail {
+  width: 26px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 0;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  border-right: 1px solid #2a2a3a;
+}
+
+.ssc-lines {
+  flex: 1;
+  padding: 7px 8px;
+  overflow: hidden;
+}
+
+.ssc-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 13px;
+  margin-bottom: 1px;
+}
+
+.ssc-gutter {
+  width: 16px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.ssc-txt {
+  flex: 1;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 8px;
+  line-height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ssc-bar {
+  display: block;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 3px;
+}
+
+.c-comment { color: #6c7086; }
+.c-kw { color: #cba6f7; }
+.c-fn { color: #89b4fa; }
+.c-str { color: #a6e3a1; }
+
+.ssc-vline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #111;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ssc-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #1a1a22;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: ew-resize;
+  z-index: 11;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  padding: 0;
+  font-family: inherit;
+  touch-action: none;
+}
+
+.ssc-handle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .ssc-scene {
+    height: 220px;
+  }
+
+  .ssc-compose {
+    top: 34px;
+  }
+
+  .ssc-assist p {
+    font-size: 8.5px;
+  }
+}

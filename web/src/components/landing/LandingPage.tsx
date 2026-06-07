@@ -2,10 +2,11 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { ComingSoonModal } from './ComingSoonModal'
 import { InstallModal } from './InstallModal'
-import { ActionBar, ProductWidget } from './ProductWidget'
+import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
+import { ScreenShareCompare } from './ScreenShareCompare'
 import './landing.css'
 
 type LandingPageProps = {
@@ -141,53 +142,6 @@ function GetMacButton({
   )
 }
 
-function CompareSlider() {
-  const [pos, setPos] = useState(50)
-  const dragging = useRef(false)
-
-  const move = useCallback((clientX: number, rect: DOMRect) => {
-    const pct = Math.min(92, Math.max(8, ((clientX - rect.left) / rect.width) * 100))
-    setPos(pct)
-  }, [])
-
-  return (
-    <div
-      className="landing-compare"
-      onMouseMove={(e) => {
-        if (!dragging.current) return
-        move(e.clientX, e.currentTarget.getBoundingClientRect())
-      }}
-      onMouseUp={() => { dragging.current = false }}
-      onMouseLeave={() => { dragging.current = false }}
-      onTouchMove={(e) => {
-        if (!dragging.current || !e.touches[0]) return
-        move(e.touches[0].clientX, e.currentTarget.getBoundingClientRect())
-      }}
-      onTouchEnd={() => { dragging.current = false }}
-    >
-      <div className="landing-compare-left" style={{ width: `${pos}%` }}>
-        <div className="landing-compare-code">
-          <div className="landing-compare-codebar" />
-          <div className="landing-compare-overlay">AI Response</div>
-        </div>
-        <span className="landing-compare-badge visible">Visible to you</span>
-      </div>
-      <div className="landing-compare-right">
-        <div className="landing-compare-code solo" />
-        <span className="landing-compare-badge hidden">Invisible to others</span>
-      </div>
-      <div
-        className="landing-compare-handle"
-        style={{ left: `${pos}%` }}
-        onMouseDown={() => { dragging.current = true }}
-        onTouchStart={() => { dragging.current = true }}
-      >
-        ⇔
-      </div>
-    </div>
-  )
-}
-
 function RecordingTimer() {
   const [seconds, setSeconds] = useState(14)
 
@@ -223,7 +177,42 @@ function useScrollReveal() {
   }, [])
 }
 
+function MoveOverlayDemo({ demoRef }: { demoRef: RefObject<OverlayDemoHandle | null> }) {
+  const nudge = (dx: number, dy: number) => demoRef.current?.nudge(dx, dy)
+
+  return (
+    <>
+      <div className="landing-move-widget">
+        <OverlayDemo size="sm" draggable showMoveArrows demoRef={demoRef} />
+      </div>
+      <div className="landing-keys-row">
+        <span className="landing-key-mini">⌘</span>
+        <span>+</span>
+        {(
+          [
+            { label: '↑', dx: 0, dy: -14 },
+            { label: '↓', dx: 0, dy: 14 },
+            { label: '←', dx: -14, dy: 0 },
+            { label: '→', dx: 14, dy: 0 },
+          ] as const
+        ).map((key) => (
+          <button
+            key={key.label}
+            type="button"
+            className="landing-key-mini landing-key-btn"
+            onClick={() => nudge(key.dx, key.dy)}
+            aria-label={`Move overlay ${key.label}`}
+          >
+            {key.label}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export function LandingPage({ macDownloadUrl }: LandingPageProps) {
+  const moveDemoRef = useRef<OverlayDemoHandle>(null)
   const [navScrolled, setNavScrolled] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -297,7 +286,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
         </div>
 
         <div className="landing-hero-widget-wrap">
-          <ProductWidget size="lg" showCursor showPill />
+          <OverlayDemo size="lg" showQuickPrompts defaultScreen />
         </div>
       </section>
 
@@ -323,8 +312,8 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
                 ))}
               </div>
             </div>
-            <div className="landing-card-action-bar">
-              <ActionBar compact />
+            <div className="landing-card-overlay">
+              <OverlayDemo size="sm" defaultRecording />
             </div>
           </div>
 
@@ -335,7 +324,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
             <p className="landing-card-sub dark">
               Hit ⌘ + Enter and Clarifi helps you with AI in the moment.
             </p>
-            <ProductWidget size="sm" showPill showCursor={false} />
+            <OverlayDemo size="md" showQuickPrompts defaultScreen />
           </div>
         </div>
       </section>
@@ -414,8 +403,8 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
           </div>
 
           <div className="landing-undetect-feature grad-pink">
-            <div className="landing-undetect-visual">
-              <CompareSlider />
+            <div className="landing-undetect-visual landing-undetect-visual-compare">
+              <ScreenShareCompare />
             </div>
             <h3>Invisible to screen share.</h3>
             <p>Never shows up in shared screens, recordings, or external tools.</p>
@@ -423,17 +412,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
 
           <div className="landing-undetect-feature grad-blue">
             <div className="landing-undetect-visual landing-undetect-move">
-              <div className="landing-move-widget">
-                <ProductWidget size="sm" showPill={false} />
-              </div>
-              <div className="landing-keys-row">
-                <span className="landing-key-mini">⌘</span>
-                <span>+</span>
-                <span className="landing-key-mini">↑</span>
-                <span className="landing-key-mini">↓</span>
-                <span className="landing-key-mini">←</span>
-                <span className="landing-key-mini">→</span>
-              </div>
+              <MoveOverlayDemo demoRef={moveDemoRef} />
             </div>
             <h3>Follows your eyes.</h3>
             <p>Fully moveable — position it exactly where you&apos;re looking.</p>
