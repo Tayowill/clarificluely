@@ -1,11 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { OverlayDemo } from '@/components/landing/OverlayDemo'
 import { createClient } from '@/lib/supabase/client'
-import { isSupabaseConfigured } from '@/lib/supabase/env'
+import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
 import '@/components/landing/landing.css'
@@ -65,7 +65,15 @@ function JoinWaitlistButton({
   )
 }
 
-export function WaitlistPage() {
+type WaitlistPageProps = {
+  supabaseConfig: SupabasePublicConfig | null
+}
+
+export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
+  const router = useRouter()
+  const [activeConfig, setActiveConfig] = useState<SupabasePublicConfig | null>(supabaseConfig)
+  const [configChecked, setConfigChecked] = useState(supabaseConfig !== null)
+  const signupEnabled = activeConfig !== null
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [countdown, setCountdown] = useState(getLaunchCountdown())
@@ -100,8 +108,24 @@ export function WaitlistPage() {
       .catch(() => setWaitlistCount(null))
   }, [])
 
+  useEffect(() => {
+    if (activeConfig) {
+      setConfigChecked(true)
+      return
+    }
+    void fetch('/api/waitlist/config')
+      .then((r) => r.json())
+      .then((d: { enabled?: boolean; url?: string; key?: string }) => {
+        if (d.enabled && d.url && d.key) {
+          setActiveConfig({ url: d.url, key: d.key })
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setConfigChecked(true))
+  }, [activeConfig])
+
   const completeJoin = useCallback(async () => {
-    const supabase = createClient()
+    const supabase = createClient(activeConfig)
     if (!supabase) return
     const result = await joinWaitlist(supabase)
     if (result.ok) {
@@ -114,7 +138,7 @@ export function WaitlistPage() {
       setStatus('error')
       setMessage('Something went wrong. Please try again.')
     }
-  }, [])
+  }, [activeConfig])
 
   useEffect(() => {
     if (searchParams.get('joined') === '1') {
@@ -130,8 +154,12 @@ export function WaitlistPage() {
       return
     }
     if (searchParams.get('error') === 'config') {
+      if (signupEnabled) {
+        router.replace('/')
+        return
+      }
       setStatus('error')
-      setMessage('Waitlist is temporarily unavailable. Please try again later.')
+      setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
       scrollToJoin()
       return
     }
@@ -142,14 +170,16 @@ export function WaitlistPage() {
       return
     }
 
-    const supabase = createClient()
+    if (!signupEnabled) return
+
+    const supabase = createClient(activeConfig)
     if (!supabase) return
     void supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         void completeJoin()
       }
     })
-  }, [searchParams, completeJoin, scrollToJoin])
+  }, [searchParams, completeJoin, scrollToJoin, signupEnabled, activeConfig, router])
 
   const handleEmailJoin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,7 +189,7 @@ export function WaitlistPage() {
     setStatus('loading')
     setMessage('')
 
-    const supabase = createClient()
+    const supabase = createClient(activeConfig)
     if (!supabase) {
       setStatus('error')
       setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
@@ -189,7 +219,7 @@ export function WaitlistPage() {
     setStatus('loading')
     setMessage('')
 
-    const supabase = createClient()
+    const supabase = createClient(activeConfig)
     if (!supabase) {
       setStatus('error')
       setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
@@ -281,13 +311,17 @@ export function WaitlistPage() {
             </>
           )}
 
-          {!isSupabaseConfigured() && (
+          {!configChecked && (
+            <p className="waitlist-status info">Loading sign-up…</p>
+          )}
+
+          {configChecked && !signupEnabled && (
             <p className="waitlist-status info">
-            Waitlist sign-up is temporarily unavailable. Please try again later.
+              Waitlist sign-up is temporarily unavailable. Please try again later.
             </p>
           )}
 
-          {isSupabaseConfigured() && status !== 'joined' && status !== 'email_sent' && (
+          {signupEnabled && status !== 'joined' && status !== 'email_sent' && (
             <div className="waitlist-form">
               <form className="waitlist-email-row" onSubmit={(e) => void handleEmailJoin(e)}>
                 <input

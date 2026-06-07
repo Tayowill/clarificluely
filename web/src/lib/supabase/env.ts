@@ -1,4 +1,6 @@
-export function getSupabaseEnv(): { url: string; key: string } | null {
+export type SupabasePublicConfig = { url: string; key: string }
+
+export function getSupabaseEnv(): SupabasePublicConfig | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
   const key = (
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??

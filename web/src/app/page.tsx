@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
+import { getSupabaseEnv } from '@/lib/supabase/env'
 
 type HomeProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -18,9 +19,11 @@ export default async function Home({ searchParams }: HomeProps) {
     if (target) redirect(target)
   }
 
+  const supabaseConfig = getSupabaseEnv()
+
   return (
     <Suspense fallback={null}>
-      <WaitlistPage />
+      <WaitlistPage supabaseConfig={supabaseConfig} />
     </Suspense>
   )
 }
