@@ -1,3 +1,4 @@
+import { isCreatorUser } from './creator'
 import { getDailyLimit, normalizePlan, type Plan } from './plans'
 import { getSupabaseAdmin } from './supabase-admin'
 
@@ -38,6 +39,8 @@ async function readCount(userId: string, date: string): Promise<number> {
 }
 
 export async function getUserPlan(userId: string): Promise<Plan> {
+  if (isCreatorUser(userId)) return 'pro_plus'
+
   const supabase = getSupabaseAdmin()
   if (supabase) {
     const { data } = await supabase

@@ -1,3 +1,4 @@
+import { isCreatorUser } from './creator'
 import { getDailyLimit, type Plan } from './plans'
 import { getSupabaseAdmin } from './supabase-admin'
 
@@ -24,6 +25,8 @@ export async function enforceLlmRateLimit(
   plan: Plan,
   route: LlmRoute,
 ): Promise<{ allowed: boolean; window?: 'hour' | 'day'; retryAfterSeconds?: number }> {
+  if (isCreatorUser(userId)) return { allowed: true }
+
   const supabase = getSupabaseAdmin()
   const dailyLimit = getDailyLimit(plan)
   const hourlyLimit = HOURLY_LIMITS[plan]

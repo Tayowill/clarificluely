@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { isCreatorUser } from './creator'
 import { getSupabaseAdmin } from './supabase-admin'
 
 const AUTH_TOKEN_TTL_MS = 5 * 60 * 1000
@@ -60,10 +61,18 @@ export async function exchangeDesktopAuthToken(
     return { ok: false, error: 'token_expired' }
   }
 
-  await supabase.from('profiles').upsert(
-    { user_id: data.clerk_user_id, plan: 'free', updated_at: new Date().toISOString() },
-    { onConflict: 'user_id' },
-  )
+  const { count: profileCount } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', data.clerk_user_id)
+
+  if (!profileCount) {
+    await supabase.from('profiles').insert({
+      user_id: data.clerk_user_id,
+      plan: isCreatorUser(data.clerk_user_id) ? 'pro_plus' : 'free',
+      updated_at: new Date().toISOString(),
+    })
+  }
 
   const { error: deviceError } = await supabase.from('desktop_devices').upsert(
     {
