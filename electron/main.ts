@@ -1,17 +1,73 @@
-import * as dotenv from 'dotenv'
 import * as path from 'path'
 
-dotenv.config({ path: path.join(process.cwd(), '.env.local') })
-
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, globalShortcut, systemPreferences } from 'electron'
+import { exchangeAuthToken } from './deviceAuth'
 import { registerHandlers } from './ipc/handlers'
+import { loadRuntimeEnv } from './keys'
+import { queueAuthUrl, takePendingAuthUrl } from './protocolAuth'
 import { checkForSignedUpdates, configureUpdater } from './updater'
+import {
+  createOverlayWindow,
+  getOverlayWindow,
+  toggleOverlayVisibility,
+} from './overlay'
+import { stopOverlayFollow } from './overlayPosition'
+
+// Best-effort: helps setContentProtection on older macOS capture paths (may not affect ScreenCaptureKit/Meet)
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'IOSurfaceCapturer')
+}
 
 const isDev = !app.isPackaged
+const PROTOCOL = 'clarifi'
 
 let mainWindow: BrowserWindow | null = null
 
-function createWindow(): void {
+async function handleAuthDeepLink(url: string): Promise<void> {
+  const result = await exchangeAuthToken(url)
+  if (result.ok) {
+    console.log('Desktop connected via web auth')
+  } else {
+    console.error('Desktop auth exchange failed:', result.error)
+  }
+}
+
+function registerProtocolClient(): void {
+  if (process.defaultApp) {
+    if (process.argv.length >= 2) {
+      app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [
+        path.resolve(process.argv[1]),
+      ])
+    }
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL)
+  }
+}
+
+if (process.platform === 'darwin') {
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    if (url.startsWith(`${PROTOCOL}://`)) {
+      if (app.isReady()) {
+        void handleAuthDeepLink(url)
+      } else {
+        queueAuthUrl(url)
+      }
+    }
+  })
+}
+
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const authUrl = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
+    if (authUrl) void handleAuthDeepLink(authUrl)
+  })
+}
+
+function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -24,8 +80,6 @@ function createWindow(): void {
       allowRunningInsecureContent: false,
     },
   })
-
-  registerHandlers(mainWindow)
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('http://localhost') && !url.startsWith('file://')) {
@@ -59,6 +113,8 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  return mainWindow
 }
 
 async function initializeStorage(): Promise<void> {
@@ -71,13 +127,51 @@ async function initializeStorage(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  loadRuntimeEnv()
+  registerProtocolClient()
+
+  const pending = takePendingAuthUrl()
+  if (pending) await handleAuthDeepLink(pending)
+
+  if (!isDev && process.argv.length > 1) {
+    const authArg = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
+    if (authArg) await handleAuthDeepLink(authArg)
+  }
+
+  if (process.platform === 'darwin') {
+    const micStatus = systemPreferences.getMediaAccessStatus('microphone')
+    if (micStatus !== 'granted') {
+      await systemPreferences.askForMediaAccess('microphone')
+    }
+  }
+
   await configureUpdater()
   await initializeStorage()
-  createWindow()
+
+  registerHandlers()
+
+  if (isDev) {
+    const window = createWindow()
+    window.webContents.once('did-finish-load', () => {
+      createOverlayWindow()
+    })
+  } else {
+    // Production: overlay only (no "MyApp" dev shell window).
+    createOverlayWindow()
+  }
+
+  globalShortcut.register('CommandOrControl+Shift+Space', () => {
+    toggleOverlayVisibility()
+  })
 
   if (!isDev) {
     void checkForSignedUpdates()
   }
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+  stopOverlayFollow()
 })
 
 app.on('window-all-closed', () => {
@@ -87,7 +181,17 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
+  if (isDev) {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+    return
+  }
+
+  const overlay = getOverlayWindow()
+  if (!overlay || overlay.isDestroyed()) {
+    createOverlayWindow()
+  } else if (!overlay.isVisible()) {
+    overlay.showInactive()
   }
 })
