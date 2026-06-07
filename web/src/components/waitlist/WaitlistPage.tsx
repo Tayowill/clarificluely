@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
+import { fireWaitlistConfetti } from '@/lib/waitlist-confetti'
 import '@/components/landing/landing.css'
 import './waitlist.css'
 
@@ -81,7 +82,6 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
     'idle',
   )
   const [message, setMessage] = useState('')
-  const [waitlistCount, setWaitlistCount] = useState<number | null>(null)
   const [navScrolled, setNavScrolled] = useState(false)
 
   const scrollToJoin = useCallback(() => {
@@ -112,11 +112,9 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
   }, [configChecked, signupEnabled, searchParams, router])
 
   useEffect(() => {
-    void fetch('/api/waitlist/count')
-      .then((r) => r.json())
-      .then((d: { count?: number | null }) => setWaitlistCount(d.count ?? null))
-      .catch(() => setWaitlistCount(null))
-  }, [])
+    if (status !== 'joined') return
+    void fireWaitlistConfetti()
+  }, [status])
 
   useEffect(() => {
     if (activeConfig) {
@@ -141,9 +139,6 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
     if (result.ok) {
       setStatus('joined')
       setMessage("You're on the list. We'll email you when Clarifi launches.")
-      void fetch('/api/waitlist/count')
-        .then((r) => r.json())
-        .then((d: { count?: number | null }) => setWaitlistCount(d.count ?? null))
     } else {
       setStatus('error')
       setMessage('Something went wrong. Please try again.')
@@ -380,13 +375,6 @@ export function WaitlistPage({ supabaseConfig }: WaitlistPageProps) {
               }`}
             >
               {message}
-            </p>
-          )}
-
-          {waitlistCount !== null && waitlistCount > 0 && (
-            <p className="waitlist-count-note">
-              {waitlistCount.toLocaleString()} {waitlistCount === 1 ? 'person' : 'people'} on the
-              waitlist
             </p>
           )}
 
