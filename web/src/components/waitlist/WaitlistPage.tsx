@@ -129,6 +129,18 @@ export function WaitlistPage() {
       scrollToJoin()
       return
     }
+    if (searchParams.get('error') === 'config') {
+      setStatus('error')
+      setMessage('Waitlist is temporarily unavailable. Please try again later.')
+      scrollToJoin()
+      return
+    }
+    if (searchParams.get('error') === 'waitlist') {
+      setStatus('error')
+      setMessage('You signed in, but we could not add you to the waitlist. Please try again.')
+      scrollToJoin()
+      return
+    }
 
     const supabase = createClient()
     if (!supabase) return
@@ -150,7 +162,7 @@ export function WaitlistPage() {
     const supabase = createClient()
     if (!supabase) {
       setStatus('error')
-      setMessage('Waitlist sign-up is not configured yet. Add Supabase keys to .env.local and restart the dev server.')
+      setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
       return
     }
     const redirectTo = `${window.location.origin}/auth/callback?next=/`
@@ -180,7 +192,7 @@ export function WaitlistPage() {
     const supabase = createClient()
     if (!supabase) {
       setStatus('error')
-      setMessage('Waitlist sign-up is not configured yet. Add Supabase keys to .env.local and restart the dev server.')
+      setMessage('Waitlist sign-up is temporarily unavailable. Please try again later.')
       return
     }
     const { error } = await supabase.auth.signInWithOAuth({
@@ -271,8 +283,7 @@ export function WaitlistPage() {
 
           {!isSupabaseConfigured() && (
             <p className="waitlist-status info">
-              Waitlist sign-up is not configured. Add Supabase keys to <code>.env.local</code> and
-              restart the dev server.
+            Waitlist sign-up is temporarily unavailable. Please try again later.
             </p>
           )}
 
