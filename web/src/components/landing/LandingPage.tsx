@@ -7,6 +7,7 @@ import { ComingSoonModal } from './ComingSoonModal'
 import { InstallModal } from './InstallModal'
 import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
 import { ScreenShareCompare } from './ScreenShareCompare'
+import '@/components/waitlist/waitlist.css'
 import './landing.css'
 
 type LandingPageProps = {
@@ -120,7 +121,7 @@ function ClarifiLogo() {
   )
 }
 
-function GetMacButton({
+function JoinWaitlistButton({
   onClick,
   className = '',
   large = false,
@@ -137,7 +138,7 @@ function GetMacButton({
       className={`landing-cta ${dark ? 'landing-cta-dark' : ''} ${className} ${large ? 'landing-cta-large' : ''}`}
       onClick={onClick}
     >
-      <AppleIcon /> Get for Mac
+      Join the waitlist
     </button>
   )
 }
@@ -236,6 +237,10 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
     setInstallOpen(true)
   }, [macDownloadUrl])
 
+  const joinWaitlist = useCallback(() => {
+    window.location.href = '/#join'
+  }, [])
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -269,7 +274,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
             </Link>
           </div>
 
-          <GetMacButton onClick={triggerDownload} className="landing-nav-cta" />
+          <JoinWaitlistButton onClick={joinWaitlist} className="landing-nav-cta" />
         </div>
       </nav>
 
@@ -278,11 +283,16 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
         <div className="landing-hero-glow landing-hero-glow-a" aria-hidden />
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content">
-          <h1>#1 Undetectable AI for Meetings</h1>
+          <h1 className="waitlist-hero-title">
+            F*ck Cluely.{' '}
+            <span className="waitlist-hero-title-sub">
+              Amplify your potential with knowledge at your fingertips
+            </span>
+          </h1>
           <p>
             Real-time answers and perfect notes — invisible on your screen, invisible on screen share.
           </p>
-          <GetMacButton onClick={triggerDownload} large />
+          <JoinWaitlistButton onClick={joinWaitlist} large />
         </div>
 
         <div className="landing-hero-widget-wrap">
@@ -512,7 +522,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
                 ))}
               </ul>
               {tier.cta === 'download' ? (
-                <GetMacButton onClick={triggerDownload} className="landing-pricing-cta" />
+                <JoinWaitlistButton onClick={joinWaitlist} className="landing-pricing-cta" />
               ) : (
                 <Link href="/billing" className="landing-cta landing-pricing-cta">
                   View plans
@@ -547,7 +557,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
       <section className="landing-prefooter" data-reveal>
         <h2>Meeting AI that helps during the call, not after.</h2>
         <p>Try Clarifi on your next meeting today.</p>
-        <GetMacButton onClick={triggerDownload} large />
+        <JoinWaitlistButton onClick={joinWaitlist} large />
         <div className="landing-keys">
           <span className="landing-key cmd">⌘</span>
           <span className="landing-key enter">↵</span>

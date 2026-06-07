@@ -1,6 +1,10 @@
-import { LandingPage } from '@/components/landing/LandingPage'
-import { getMacDownloadUrl } from '@/lib/downloads'
+import { Suspense } from 'react'
+import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
 
 export default function Home() {
-  return <LandingPage macDownloadUrl={getMacDownloadUrl()} />
+  return (
+    <Suspense fallback={null}>
+      <WaitlistPage />
+    </Suspense>
+  )
 }

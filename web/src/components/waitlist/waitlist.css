@@ -1,0 +1,250 @@
+.waitlist-page .landing-nav-inner {
+  max-width: 1100px;
+}
+
+.waitlist-hero-content {
+  max-width: 820px;
+}
+
+.waitlist-hero-title {
+  font-size: clamp(2rem, 5.5vw, 3.75rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.03em;
+}
+
+.waitlist-hero-title-sub {
+  display: block;
+  margin-top: 0.35em;
+  font-weight: 600;
+  color: var(--cl-navy);
+}
+
+.waitlist-join {
+  padding: 4rem 1.5rem 5rem;
+  background: linear-gradient(180deg, #fff 0%, var(--cl-lavender-soft) 100%);
+}
+
+.waitlist-join-inner {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.waitlist-eyebrow {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6366f1;
+  margin-bottom: 1rem;
+}
+
+.waitlist-title {
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-bottom: 1rem;
+}
+
+.waitlist-sub {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #64748b;
+  max-width: 480px;
+  margin: 0 auto 2.5rem;
+}
+
+.waitlist-countdown {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 2.75rem;
+}
+
+.waitlist-unit {
+  background: #fff;
+  border: 1px solid rgba(26, 26, 46, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem 0.75rem;
+  box-shadow: 0 8px 32px rgba(26, 26, 46, 0.06);
+}
+
+.waitlist-unit-value {
+  display: block;
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #1a1a2e;
+}
+
+.waitlist-unit-label {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.waitlist-launch-date {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 2rem;
+}
+
+.waitlist-launch-date strong {
+  color: #1a1a2e;
+}
+
+.waitlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.waitlist-email-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.waitlist-input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 1rem;
+  border: 1px solid rgba(26, 26, 46, 0.12);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.waitlist-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.waitlist-btn {
+  height: 48px;
+  padding: 0 1.25rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.waitlist-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.waitlist-btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.waitlist-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.waitlist-btn-google {
+  background: #fff;
+  color: #1a1a2e;
+  border: 1px solid rgba(26, 26, 46, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.waitlist-btn-google:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.waitlist-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  margin: 0.25rem 0;
+}
+
+.waitlist-divider::before,
+.waitlist-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(26, 26, 46, 0.08);
+}
+
+.waitlist-status {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+}
+
+.waitlist-status.success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.waitlist-status.info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.waitlist-status.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.waitlist-count-note {
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.waitlist-footer {
+  margin-top: 2rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.waitlist-footer a {
+  color: #64748b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .waitlist-email-row {
+    flex-direction: column;
+  }
+
+  .waitlist-countdown {
+    gap: 0.5rem;
+  }
+
+  .waitlist-unit {
+    padding: 1rem 0.5rem;
+  }
+}
