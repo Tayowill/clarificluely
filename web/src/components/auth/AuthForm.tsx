@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { authNextCookieValue } from '@/lib/auth-next'
 import { createClient } from '@/lib/supabase/client'
 import { authCallbackUrl } from '@/lib/site-url'
 
@@ -36,6 +36,11 @@ type AuthFormProps = {
   subtitle: string
   alternateHref: string
   alternateLabel: string
+  error?: string | null
+}
+
+function rememberAuthNext(next: string) {
+  document.cookie = authNextCookieValue(next)
 }
 
 export function AuthForm({
@@ -45,22 +50,13 @@ export function AuthForm({
   subtitle,
   alternateHref,
   alternateLabel,
+  error,
 }: AuthFormProps) {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'email_sent' | 'error'>('idle')
-  const [message, setMessage] = useState('')
-  const redirectTo = authCallbackUrl().replace('?next=/', `?next=${encodeURIComponent(next)}`)
+  const [message, setMessage] = useState(error ?? '')
 
-  useEffect(() => {
-    const supabase = createClient()
-    if (!supabase) return
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        router.replace(next)
-      }
-    })
-  }, [next, router])
+  const redirectTo = authCallbackUrl(next)
 
   const handleEmail = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,6 +65,7 @@ export function AuthForm({
 
     setStatus('loading')
     setMessage('')
+    rememberAuthNext(next)
 
     const supabase = createClient()
     if (!supabase) {
@@ -77,17 +74,17 @@ export function AuthForm({
       return
     }
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error: otpError } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
         emailRedirectTo: redirectTo,
-        shouldCreateUser: mode === 'sign-up',
+        shouldCreateUser: true,
       },
     })
 
-    if (error) {
+    if (otpError) {
       setStatus('error')
-      setMessage(error.message)
+      setMessage(otpError.message)
       return
     }
 
@@ -98,6 +95,7 @@ export function AuthForm({
   const handleGoogle = async () => {
     setStatus('loading')
     setMessage('')
+    rememberAuthNext(next)
 
     const supabase = createClient()
     if (!supabase) {
@@ -106,15 +104,14 @@ export function AuthForm({
       return
     }
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
     })
 
-    if (error) {
+    if (oauthError) {
       setStatus('error')
-      setMessage(error.message)
-      setStatus('error')
+      setMessage(oauthError.message)
     }
   }
 
@@ -155,7 +152,9 @@ export function AuthForm({
         </button>
 
         {message ? (
-          <p className={`auth-status ${status === 'error' ? 'error' : status === 'email_sent' ? 'success' : ''}`}>
+          <p
+            className={`auth-status ${status === 'error' || error ? 'error' : status === 'email_sent' ? 'success' : ''}`}
+          >
             {message}
           </p>
         ) : null}

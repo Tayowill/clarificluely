@@ -18,12 +18,21 @@ function getSupabaseEnv() {
 export default async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
+  // PKCE cookies are host-specific — always use www before any auth flow.
+  if (request.nextUrl.hostname === 'clarifiapp.com') {
+    const canonical = request.nextUrl.clone()
+    canonical.hostname = 'www.clarifiapp.com'
+    canonical.protocol = 'https:'
+    return NextResponse.redirect(canonical, 308)
+  }
+
   if (pathname.startsWith('/preview')) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
   if (pathname === '/' && searchParams.get('code')) {
-    const target = authCallbackRedirectPath(searchParams)
+    const authNext = request.cookies.get('clarifi_auth_next')?.value ?? null
+    const target = authCallbackRedirectPath(searchParams, authNext)
     if (target) {
       const siteOrigin = getSiteOrigin(request.nextUrl.origin)
       return NextResponse.redirect(new URL(target, siteOrigin))
@@ -61,7 +70,11 @@ export default async function proxy(request: NextRequest) {
       if (!user) {
         const signIn = new URL('/sign-in', request.url)
         signIn.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
-        return NextResponse.redirect(signIn)
+        const redirectResponse = NextResponse.redirect(signIn)
+        response.cookies.getAll().forEach((cookie) => {
+          redirectResponse.cookies.set(cookie)
+        })
+        return redirectResponse
       }
     }
   }

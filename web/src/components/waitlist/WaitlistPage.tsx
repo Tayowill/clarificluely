@@ -74,7 +74,7 @@ type WaitlistPageProps = {
 }
 
 export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) {
-  const oauthRedirectTo = authCallbackUrl(siteOrigin)
+  const oauthRedirectTo = authCallbackUrl('/', siteOrigin)
   const router = useRouter()
   const [activeConfig, setActiveConfig] = useState<SupabasePublicConfig | null>(supabaseConfig)
   const [configChecked, setConfigChecked] = useState(supabaseConfig !== null)

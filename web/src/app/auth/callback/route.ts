@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { AUTH_NEXT_COOKIE, resolveAuthNext } from '@/lib/auth-next'
 import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
@@ -11,26 +12,32 @@ export const dynamic = 'force-dynamic'
 
 function redirectTo(request: Request, path: string) {
   const siteOrigin = getSiteOrigin(new URL(request.url).origin)
-  return NextResponse.redirect(`${siteOrigin}${path}`)
+  const response = NextResponse.redirect(`${siteOrigin}${path}`)
+  response.cookies.set(AUTH_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
+  return response
 }
 
 function isWaitlistRedirect(next: string): boolean {
-  return next === '/' || next.startsWith('/?')
+  return next === '/'
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
-  const safeNext = next.startsWith('/') ? next : '/'
+  const cookieStore = await cookies()
+  const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
+  const next = resolveAuthNext(
+    searchParams.get('next') ?? authNextCookie,
+    '/dashboard',
+  )
+  const safeNext = next.startsWith('/') ? next : '/dashboard'
   const env = getSupabaseEnv()
 
   if (!code || !env) {
-    return redirectTo(request, '/?error=auth')
+    return redirectTo(request, '/sign-in?error=auth')
   }
 
-  const cookieStore = await cookies()
-  const successPath = isWaitlistRedirect(safeNext) ? `${safeNext.split('?')[0]}?joined=1` : safeNext
+  const successPath = isWaitlistRedirect(safeNext) ? '/?joined=1' : safeNext
   let response = redirectTo(request, successPath)
 
   const supabase = createServerClient(env.url, env.key, {
@@ -49,24 +56,11 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user?.email && isWaitlistRedirect(safeNext)) {
-      const admin = getSupabaseAdmin()
-      if (admin) {
-        await admin.from('waitlist_signups').upsert(
-          { user_id: user.id, email: user.email },
-          { onConflict: 'user_id' },
-        )
-      } else {
-        await joinWaitlist(supabase)
-      }
-      return response
-    }
-
-    return redirectTo(request, isWaitlistRedirect(safeNext) ? '/?error=auth' : `${safeNext}?error=auth`)
+    console.error('auth callback exchange failed:', error.message)
+    return redirectTo(
+      request,
+      isWaitlistRedirect(safeNext) ? '/?error=auth' : `/sign-in?next=${encodeURIComponent(safeNext)}&error=auth`,
+    )
   }
 
   const {
@@ -74,7 +68,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user?.email) {
-    return redirectTo(request, '/?error=auth')
+    return redirectTo(request, '/sign-in?error=auth')
   }
 
   const admin = getSupabaseAdmin()

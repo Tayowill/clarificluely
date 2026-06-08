@@ -28,6 +28,7 @@ export function getSiteOrigin(requestOrigin?: string): string {
   return DEFAULT_SITE_URL
 }
 
-export function authCallbackUrl(origin?: string): string {
-  return `${getSiteOrigin(origin)}/auth/callback?next=/`
+export function authCallbackUrl(next = '/', origin?: string): string {
+  const safeNext = next.startsWith('/') ? next : '/'
+  return `${getSiteOrigin(origin)}/auth/callback?next=${encodeURIComponent(safeNext)}`
 }

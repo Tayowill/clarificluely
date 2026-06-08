@@ -14,7 +14,7 @@ export const metadata = {
 
 export default async function DashboardPage() {
   const user = await getServerUser()
-  if (!user) redirect('/sign-in')
+  if (!user) redirect('/sign-in?next=/dashboard')
 
   const stats = await getUsageStats(user.id)
   const limitLabel = Number.isFinite(stats.limit)
