@@ -1,9 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { resolveAuthNext } from '@/lib/auth-next'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
 import { isPublicPath } from '@/lib/protected-routes'
-import { getSiteOrigin } from '@/lib/site-url'
 
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
@@ -34,8 +34,7 @@ export default async function proxy(request: NextRequest) {
     const authNext = request.cookies.get('clarifi_auth_next')?.value ?? null
     const target = authCallbackRedirectPath(searchParams, authNext)
     if (target) {
-      const siteOrigin = getSiteOrigin(request.nextUrl.origin)
-      return NextResponse.redirect(new URL(target, siteOrigin))
+      return NextResponse.redirect(new URL(target, request.url))
     }
   }
 
@@ -60,13 +59,22 @@ export default async function proxy(request: NextRequest) {
       },
     })
 
-    await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (pathname === '/sign-in' || pathname === '/sign-up') {
+      if (user) {
+        const dest = resolveAuthNext(searchParams.get('next'), '/dashboard')
+        const redirectResponse = NextResponse.redirect(new URL(dest, request.url))
+        response.cookies.getAll().forEach((cookie) => {
+          redirectResponse.cookies.set(cookie)
+        })
+        return redirectResponse
+      }
+    }
 
     if (!isPublicPath(pathname)) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       if (!user) {
         const signIn = new URL('/sign-in', request.url)
         signIn.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
