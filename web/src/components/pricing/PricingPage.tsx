@@ -65,8 +65,8 @@ export function PricingPage() {
         <section className="pricing-hero">
           <h1 className="pricing-hero-title">Start for free.</h1>
           <p className="pricing-hero-sub">
-            Whether you&apos;re using Clarifi for meetings, interviews, sales calls, or just
-            curious — it&apos;s free to start.
+            Get instant access to Clarifi and upgrade every conversation. Unlock Clarifi for your
+            conversations.
           </p>
 
           <div className="pricing-toggles">

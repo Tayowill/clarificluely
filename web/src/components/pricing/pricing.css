@@ -128,6 +128,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.25rem;
+  align-items: stretch;
 }
 
 .pricing-card {
@@ -147,6 +148,7 @@
 
 .pricing-card-head {
   margin-bottom: 1.25rem;
+  min-height: 5.25rem;
 }
 
 .pricing-card-name {
@@ -234,12 +236,14 @@
   font-size: 0.9rem;
   color: var(--cl-muted);
   margin-bottom: 1.25rem;
+  min-height: 2.75rem;
 }
 
 .pricing-card-features {
   list-style: none;
   padding: 0;
   margin: 0;
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -286,7 +290,7 @@
 .pricing-compare-header,
 .pricing-compare-row {
   display: grid;
-  grid-template-columns: 1.4fr repeat(3, 1fr);
+  grid-template-columns: minmax(200px, 1.35fr) repeat(3, minmax(0, 1fr));
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
@@ -301,6 +305,14 @@
   letter-spacing: 0.04em;
 }
 
+.pricing-compare-header span:not(:first-child) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.3;
+}
+
 .pricing-compare-row:last-child {
   border-bottom: none;
 }
@@ -312,9 +324,14 @@
 }
 
 .pricing-compare-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 0.85rem;
   color: #4b5563;
   text-align: center;
+  line-height: 1.35;
+  min-height: 2.5rem;
 }
 
 .pricing-compare-yes {
