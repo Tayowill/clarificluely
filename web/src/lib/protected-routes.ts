@@ -17,6 +17,7 @@ const PUBLIC_PREFIXES = [
   '/desktop/sign-up',
   '/api/desktop/exchange',
   '/api/desktop/status',
+  '/api/desktop/profile',
   '/api/waitlist',
   '/api/llm/chat',
   '/api/llm/suggest',

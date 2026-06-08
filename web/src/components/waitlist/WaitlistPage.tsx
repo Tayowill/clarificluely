@@ -257,14 +257,11 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content waitlist-hero-content">
           <h1 className="waitlist-hero-title">
-            F*ck Cluely.{' '}
-            <span className="waitlist-hero-title-sub">
-              Amplify your potential with knowledge at your fingertips
-            </span>
+            The Undetectable AI Co-Pilot for Every Conversation.
           </h1>
           <p>
-            Real-time answers and perfect notes — invisible on your screen, invisible on screen
-            share.
+            Clarifi hears what you hear. Sees what you see and provides real-time answers,
+            completely undetectable.
           </p>
           <JoinWaitlistButton onClick={scrollToJoin} large />
         </div>

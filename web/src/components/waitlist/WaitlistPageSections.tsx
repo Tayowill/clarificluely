@@ -37,7 +37,8 @@ const PRODUCT_BENEFITS = [
   },
   {
     title: 'Fully Customisable',
-    description: 'Adapts entirely to your workflow, industry, and use case.',
+    description:
+      'Tailored to your workflow, industry, and use case — with your choice of the best AI models.',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
         <line x1="4" y1="21" x2="4" y2="14" />
@@ -64,7 +65,8 @@ const PRODUCT_BENEFITS = [
   },
   {
     title: 'Real-Time Answers',
-    description: 'Instant, accurate responses exactly when you need them most.',
+    description:
+      'Watches your screen and listens to your audio to deliver instant, accurate answers when you need them most.',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />

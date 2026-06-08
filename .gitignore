@@ -11,3 +11,4 @@ release/
 .env.signing.local
 .DS_Store
 *.log
+.vercel
