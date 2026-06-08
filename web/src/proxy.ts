@@ -30,12 +30,23 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  if (pathname === '/' && searchParams.get('code')) {
+  if (searchParams.get('code') && pathname !== '/auth/callback') {
     const authNext = request.cookies.get('clarifi_auth_next')?.value ?? null
     const target = authCallbackRedirectPath(searchParams, authNext)
     if (target) {
       return NextResponse.redirect(new URL(target, request.url))
     }
+  }
+
+  if (
+    (searchParams.get('token_hash') || searchParams.get('type')) &&
+    pathname !== '/auth/confirm'
+  ) {
+    const confirm = new URL('/auth/confirm', request.url)
+    searchParams.forEach((value, key) => {
+      confirm.searchParams.set(key, value)
+    })
+    return NextResponse.redirect(confirm)
   }
 
   let response = NextResponse.next({ request })

@@ -2,6 +2,8 @@ const PUBLIC_PREFIXES = [
   '/',
   '/sitemap.xml',
   '/robots.txt',
+  '/auth/callback',
+  '/auth/confirm',
   '/auth/',
   '/blog',
   '/pricing',

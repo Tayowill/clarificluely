@@ -30,5 +30,9 @@ export function getSiteOrigin(requestOrigin?: string): string {
 
 export function authCallbackUrl(next = '/', origin?: string): string {
   const safeNext = next.startsWith('/') ? next : '/'
+  // Match the current browser host so PKCE verifier cookies stay on the same origin.
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`
+  }
   return `${getSiteOrigin(origin)}/auth/callback?next=${encodeURIComponent(safeNext)}`
 }

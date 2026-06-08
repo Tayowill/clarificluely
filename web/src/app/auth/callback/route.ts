@@ -4,12 +4,12 @@ import { AUTH_NEXT_COOKIE, resolveAuthNext } from '@/lib/auth-next'
 import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
 import { joinWaitlist } from '@/lib/waitlist'
 
 export const dynamic = 'force-dynamic'
 
-function redirectTo(request: Request, path: string) {
+function buildRedirect(request: Request, path: string) {
   const response = NextResponse.redirect(new URL(path, request.url))
   response.cookies.set(AUTH_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
   return response
@@ -36,19 +36,22 @@ export async function GET(request: Request) {
   const safeNext = resolveNextParam(searchParams, authNextCookie)
 
   if (!code || !getSupabaseEnv()) {
-    return redirectTo(request, '/sign-in?error=auth')
+    return buildRedirect(request, '/sign-in?error=auth')
   }
 
-  const supabase = await createClient()
+  const successPath = isWaitlistRedirect(safeNext) ? '/?joined=1' : safeNext
+  let response = buildRedirect(request, successPath)
+
+  const supabase = await createRouteHandlerClient(response)
   if (!supabase) {
-    return redirectTo(request, '/sign-in?error=auth')
+    return buildRedirect(request, '/sign-in?error=auth')
   }
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
     console.error('auth callback exchange failed:', error.message)
-    return redirectTo(
+    return buildRedirect(
       request,
       isWaitlistRedirect(safeNext)
         ? '/?error=auth'
@@ -61,7 +64,7 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user?.email) {
-    return redirectTo(request, '/sign-in?error=auth')
+    return buildRedirect(request, '/sign-in?error=auth')
   }
 
   const admin = getSupabaseAdmin()
@@ -73,12 +76,12 @@ export async function GET(request: Request) {
         { onConflict: 'user_id' },
       )
       if (insertError) {
-        return redirectTo(request, '/?error=waitlist')
+        return buildRedirect(request, '/?error=waitlist')
       }
     } else {
       const result = await joinWaitlist(supabase)
       if (!result.ok) {
-        return redirectTo(request, '/?error=waitlist')
+        return buildRedirect(request, '/?error=waitlist')
       }
     }
   } else if (admin) {
@@ -92,6 +95,5 @@ export async function GET(request: Request) {
     )
   }
 
-  const successPath = isWaitlistRedirect(safeNext) ? '/?joined=1' : safeNext
-  return redirectTo(request, successPath)
+  return response
 }

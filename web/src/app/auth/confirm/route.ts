@@ -1,0 +1,48 @@
+import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import type { EmailOtpType } from '@supabase/supabase-js'
+import { AUTH_NEXT_COOKIE, resolveAuthNext } from '@/lib/auth-next'
+import { getSupabaseEnv } from '@/lib/supabase/env'
+import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
+
+export const dynamic = 'force-dynamic'
+
+function buildRedirect(request: Request, path: string) {
+  const response = NextResponse.redirect(new URL(path, request.url))
+  response.cookies.set(AUTH_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
+  return response
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const tokenHash = searchParams.get('token_hash')
+  const type = searchParams.get('type') as EmailOtpType | null
+  const cookieStore = await cookies()
+  const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
+  const safeNext = resolveAuthNext(
+    searchParams.get('next') ?? (authNextCookie ? decodeURIComponent(authNextCookie) : null),
+    '/dashboard',
+  )
+
+  if (!tokenHash || !type || !getSupabaseEnv()) {
+    return buildRedirect(request, '/sign-in?error=auth')
+  }
+
+  let response = buildRedirect(request, safeNext)
+  const supabase = await createRouteHandlerClient(response)
+  if (!supabase) {
+    return buildRedirect(request, '/sign-in?error=auth')
+  }
+
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash })
+
+  if (error) {
+    console.error('auth confirm verify failed:', error.message)
+    return buildRedirect(
+      request,
+      `/sign-in?next=${encodeURIComponent(safeNext)}&error=auth`,
+    )
+  }
+
+  return response
+}
