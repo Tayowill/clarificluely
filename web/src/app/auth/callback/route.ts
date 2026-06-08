@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { getSiteOrigin } from '@/lib/site-url'
@@ -11,6 +12,10 @@ export const dynamic = 'force-dynamic'
 function redirectTo(request: Request, path: string) {
   const siteOrigin = getSiteOrigin(new URL(request.url).origin)
   return NextResponse.redirect(`${siteOrigin}${path}`)
+}
+
+function isWaitlistRedirect(next: string): boolean {
+  return next === '/' || next.startsWith('/?')
 }
 
 export async function GET(request: Request) {
@@ -25,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   const cookieStore = await cookies()
-  const successPath = `${safeNext}?joined=1`
+  const successPath = isWaitlistRedirect(safeNext) ? `${safeNext.split('?')[0]}?joined=1` : safeNext
   let response = redirectTo(request, successPath)
 
   const supabase = createServerClient(env.url, env.key, {
@@ -48,7 +53,7 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (user?.email) {
+    if (user?.email && isWaitlistRedirect(safeNext)) {
       const admin = getSupabaseAdmin()
       if (admin) {
         await admin.from('waitlist_signups').upsert(
@@ -61,7 +66,7 @@ export async function GET(request: Request) {
       return response
     }
 
-    return redirectTo(request, '/?error=auth')
+    return redirectTo(request, isWaitlistRedirect(safeNext) ? '/?error=auth' : `${safeNext}?error=auth`)
   }
 
   const {
@@ -73,19 +78,31 @@ export async function GET(request: Request) {
   }
 
   const admin = getSupabaseAdmin()
-  if (admin) {
-    const { error: insertError } = await admin.from('waitlist_signups').upsert(
-      { user_id: user.id, email: user.email },
+
+  if (isWaitlistRedirect(safeNext)) {
+    if (admin) {
+      const { error: insertError } = await admin.from('waitlist_signups').upsert(
+        { user_id: user.id, email: user.email },
+        { onConflict: 'user_id' },
+      )
+      if (insertError) {
+        return redirectTo(request, '/?error=waitlist')
+      }
+    } else {
+      const result = await joinWaitlist(supabase)
+      if (!result.ok) {
+        return redirectTo(request, '/?error=waitlist')
+      }
+    }
+  } else if (admin) {
+    await admin.from('profiles').upsert(
+      {
+        user_id: user.id,
+        plan: isCreatorUser(user.id) ? 'pro_plus' : 'free',
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'user_id' },
     )
-    if (insertError) {
-      return redirectTo(request, '/?error=waitlist')
-    }
-  } else {
-    const result = await joinWaitlist(supabase)
-    if (!result.ok) {
-      return redirectTo(request, '/?error=waitlist')
-    }
   }
 
   return response

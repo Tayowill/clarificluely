@@ -15,15 +15,9 @@ export const SUBPROCESSORS: Subprocessor[] = [
   },
   {
     name: 'Supabase',
-    purpose: 'Database, waitlist authentication, and edge functions',
+    purpose: 'Database, authentication, and edge functions',
     location: 'United States',
     website: 'https://supabase.com',
-  },
-  {
-    name: 'Clerk',
-    purpose: 'User authentication and account management',
-    location: 'United States',
-    website: 'https://clerk.com',
   },
   {
     name: 'Stripe',
@@ -45,7 +39,7 @@ export const SUBPROCESSORS: Subprocessor[] = [
   },
   {
     name: 'Google',
-    purpose: 'OAuth sign-in for waitlist registration',
+    purpose: 'OAuth sign-in (waitlist and app accounts)',
     location: 'United States',
     website: 'https://google.com',
   },

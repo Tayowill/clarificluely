@@ -2,15 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useAuth } from '@clerk/nextjs'
+import { createClient } from '@/lib/supabase/client'
 
 export default function DesktopConnectPage() {
-  const { isLoaded, isSignedIn } = useAuth()
+  const [ready, setReady] = useState(false)
+  const [signedIn, setSignedIn] = useState(false)
   const [status, setStatus] = useState<'idle' | 'loading' | 'opened' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || status !== 'idle') return
+    const supabase = createClient()
+    if (!supabase) {
+      setReady(true)
+      return
+    }
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      setSignedIn(!!session?.user)
+      setReady(true)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !signedIn || status !== 'idle') return
 
     async function authorize() {
       setStatus('loading')
@@ -34,9 +47,9 @@ export default function DesktopConnectPage() {
     }
 
     void authorize()
-  }, [isLoaded, isSignedIn, status])
+  }, [ready, signedIn, status])
 
-  if (!isLoaded) {
+  if (!ready) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center">
         <p className="text-white/50">Loading…</p>
@@ -44,7 +57,7 @@ export default function DesktopConnectPage() {
     )
   }
 
-  if (!isSignedIn) {
+  if (!signedIn) {
     return (
       <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-4 px-8">
         <h1 className="text-2xl font-bold">Sign in to connect Clarifi Desktop</h1>

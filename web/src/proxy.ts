@@ -1,34 +1,21 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
-import { updateSupabaseSession } from '@/lib/supabase/middleware'
+import { isPublicPath } from '@/lib/protected-routes'
 import { getSiteOrigin } from '@/lib/site-url'
 
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/sitemap.xml',
-  '/robots.txt',
-  '/auth/callback(.*)',
-  '/blog(.*)',
-  '/pricing',
-  '/privacy',
-  '/terms',
-  '/subprocessors',
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/sso-callback(.*)',
-  '/desktop/connect(.*)',
-  '/desktop/sign-in(.*)',
-  '/desktop/sign-up(.*)',
-  '/api/desktop/exchange',
-  '/api/desktop/status',
-  '/api/waitlist(.*)',
-  '/api/llm/chat',
-  '/api/llm/suggest',
-  '/api/llm/transcribe',
-])
+function getSupabaseEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = (
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )?.trim()
+  if (!url || !key) return null
+  return { url, key }
+}
 
-export default clerkMiddleware(async (auth, request) => {
+export default async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
   if (pathname.startsWith('/preview')) {
@@ -43,14 +30,44 @@ export default clerkMiddleware(async (auth, request) => {
     }
   }
 
-  const supabaseResponse = await updateSupabaseSession(request)
+  let response = NextResponse.next({ request })
+  const env = getSupabaseEnv()
 
-  if (!isPublicRoute(request)) {
-    await auth.protect()
+  if (env) {
+    const supabase = createServerClient(env.url, env.key, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value)
+          })
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options)
+          })
+        },
+      },
+    })
+
+    await supabase.auth.getUser()
+
+    if (!isPublicPath(pathname)) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        const signIn = new URL('/sign-in', request.url)
+        signIn.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
+        return NextResponse.redirect(signIn)
+      }
+    }
   }
 
-  return supabaseResponse
-})
+  return response
+}
 
 export const config = {
   matcher: [

@@ -1,17 +1,18 @@
-import { auth } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/auth-server'
 import { PLAN_LIMITS } from '@/lib/plans'
 import { getUsageStats } from '@/lib/usage'
 
 export async function GET() {
-  const session = await auth()
-  if (!session.userId) {
+  const user = await getServerUser()
+  if (!user) {
     return Response.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  const stats = await getUsageStats(session.userId)
+  const stats = await getUsageStats(user.id)
 
   return Response.json({
-    userId: session.userId,
+    userId: user.id,
+    email: user.email,
     plan: stats.plan,
     planLabel: PLAN_LIMITS[stats.plan].label,
     sessionsToday: stats.used,

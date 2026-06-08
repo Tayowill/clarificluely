@@ -7,7 +7,7 @@ const AUTH_TOKEN_TTL_MS = 5 * 60 * 1000
 function pepper(): string {
   return (
     process.env.DEVICE_AUTH_PEPPER?.trim() ||
-    process.env.CLERK_SECRET_KEY?.trim() ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
     'clarifi-device-dev-pepper'
   )
 }
@@ -17,7 +17,7 @@ export function hashDeviceSecret(deviceId: string, secret: string): string {
 }
 
 export async function createDesktopAuthToken(
-  clerkUserId: string,
+  userId: string,
 ): Promise<{ token: string; expiresAt: string } | null> {
   const supabase = getSupabaseAdmin()
   if (!supabase) return null
@@ -27,7 +27,7 @@ export async function createDesktopAuthToken(
 
   const { error } = await supabase.from('desktop_auth_tokens').insert({
     token,
-    clerk_user_id: clerkUserId,
+    clerk_user_id: userId,
     expires_at: expiresAt,
   })
 

@@ -1,43 +1,40 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { SignOutButton } from '@clerk/nextjs'
+import { SignOutButton } from '@/components/auth/SignOutButton'
 import { DesktopConnect } from '@/components/DesktopConnect'
+import { getServerUser } from '@/lib/auth-server'
 import { getMacDownloadUrl } from '@/lib/downloads'
 import { PLAN_LIMITS } from '@/lib/plans'
 import { getUsageStats } from '@/lib/usage'
 
-export default async function Dashboard() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+export const metadata = {
+  title: 'Dashboard — Clarifi',
+  robots: { index: false, follow: false },
+}
 
-  const user = await currentUser()
-  const stats = await getUsageStats(userId)
+export default async function DashboardPage() {
+  const user = await getServerUser()
+  if (!user) redirect('/sign-in')
+
+  const stats = await getUsageStats(user.id)
   const limitLabel = Number.isFinite(stats.limit)
     ? `${stats.used} / ${stats.limit}`
     : `${stats.used} (unlimited)`
   const macDownloadUrl = getMacDownloadUrl()
+  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
   return (
     <main className="min-h-screen bg-black text-white">
       <nav className="flex items-center justify-between px-8 py-6 border-b border-white/10">
         <span className="text-xl font-bold">Clarifi</span>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-white/60">
-            {user?.emailAddresses[0]?.emailAddress}
-          </span>
-          <SignOutButton>
-            <button className="text-sm text-white/40 hover:text-white">
-              Sign out
-            </button>
-          </SignOutButton>
+          <span className="text-sm text-white/60">{user.email}</span>
+          <SignOutButton />
         </div>
       </nav>
 
       <div className="max-w-4xl mx-auto px-8 py-12">
-        <h1 className="text-3xl font-bold mb-2">
-          Welcome, {user?.firstName || 'there'}
-        </h1>
+        <h1 className="text-3xl font-bold mb-2">Welcome, {displayName}</h1>
         <p className="text-white/50 mb-10">Manage your Clarifi account and settings</p>
 
         <div className="grid grid-cols-3 gap-6 mb-10">

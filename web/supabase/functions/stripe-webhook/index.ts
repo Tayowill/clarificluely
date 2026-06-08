@@ -56,7 +56,10 @@ Deno.serve(async (req) => {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
-    const userId = session.metadata?.clerkUserId || session.client_reference_id
+    const userId =
+      session.metadata?.userId ||
+      session.metadata?.clerkUserId ||
+      session.client_reference_id
     const plan = session.metadata?.plan === 'pro_plus' ? 'pro_plus' : 'pro'
 
     if (userId) {
@@ -77,7 +80,7 @@ Deno.serve(async (req) => {
     event.type === 'customer.subscription.deleted'
   ) {
     const subscription = event.data.object as Stripe.Subscription
-    const userId = subscription.metadata?.clerkUserId
+    const userId = subscription.metadata?.userId || subscription.metadata?.clerkUserId
     if (userId) {
       const active =
         subscription.status === 'active' || subscription.status === 'trialing'

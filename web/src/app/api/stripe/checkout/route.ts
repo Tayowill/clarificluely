@@ -1,9 +1,9 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getServerUser } from '@/lib/auth-server'
 import { getStripe, priceIdForPlan } from '@/lib/stripe'
 
 export async function POST(req: Request) {
-  const session = await auth()
-  if (!session.userId) {
+  const user = await getServerUser()
+  if (!user) {
     return Response.json({ error: 'unauthorized' }, { status: 401 })
   }
 
@@ -25,7 +25,6 @@ export async function POST(req: Request) {
     return Response.json({ error: 'price_not_configured' }, { status: 503 })
   }
 
-  const user = await currentUser()
   const origin = new URL(req.url).origin
 
   const checkout = await stripe.checkout.sessions.create({
@@ -33,15 +32,15 @@ export async function POST(req: Request) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${origin}/dashboard?checkout=success`,
     cancel_url: `${origin}/billing?checkout=cancelled`,
-    client_reference_id: session.userId,
-    customer_email: user?.emailAddresses[0]?.emailAddress,
+    client_reference_id: user.id,
+    customer_email: user.email,
     metadata: {
-      clerkUserId: session.userId,
+      userId: user.id,
       plan,
     },
     subscription_data: {
       metadata: {
-        clerkUserId: session.userId,
+        userId: user.id,
         plan,
       },
     },
