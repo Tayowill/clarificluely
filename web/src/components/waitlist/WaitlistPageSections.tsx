@@ -191,9 +191,9 @@ export function WaitlistSiteFooter() {
             <Link href="/privacy" className="landing-footer-link-btn">
               Privacy Policy
             </Link>
-            <button type="button" className="landing-footer-link-btn" disabled>
+            <Link href="/terms" className="landing-footer-link-btn">
               Terms of Service
-            </button>
+            </Link>
             <button type="button" className="landing-footer-link-btn" disabled>
               Subprocessors
             </button>
