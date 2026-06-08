@@ -78,6 +78,19 @@
   border-radius: 9999px;
   text-decoration: none;
   box-shadow: 0 4px 20px rgba(43, 108, 255, 0.35);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.blog-nav-cta-pink {
+  background: #fdf2f8;
+  color: #1a1a2e;
+  border: 1px solid rgba(236, 72, 153, 0.18);
+  box-shadow: 0 4px 20px rgba(236, 72, 153, 0.12);
+}
+
+.blog-nav-cta-pink:hover {
+  background: #fce7f3;
+  box-shadow: 0 4px 24px rgba(236, 72, 153, 0.18);
 }
 
 .blog-header {

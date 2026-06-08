@@ -110,6 +110,55 @@
   color: #1e40af;
 }
 
+.legal-layout-single {
+  grid-template-columns: 1fr;
+  max-width: 900px;
+}
+
+.legal-table-wrap {
+  margin: 2rem 0;
+  overflow-x: auto;
+  border: 1px solid #e8ecf4;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.legal-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #e8ecf4;
+  background: #f8fafc;
+}
+
+.legal-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  vertical-align: top;
+  color: #374151;
+}
+
+.legal-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.legal-table-name {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
 @media (max-width: 900px) {
   .legal-layout {
     grid-template-columns: 1fr;

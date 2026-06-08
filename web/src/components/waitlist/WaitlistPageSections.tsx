@@ -160,7 +160,10 @@ export function WaitlistSiteFooter() {
             <span className="landing-footer-logo-text">Clarifi</span>
           </a>
           <span className="landing-footer-status">● All systems operational</span>
-          <p className="waitlist-footer-subprocessors">List of subprocessors.</p>
+          <p className="waitlist-footer-subprocessors">
+            List of{' '}
+            <Link href="/subprocessors">subprocessors</Link>.
+          </p>
         </div>
 
         <div className="landing-footer-columns">
@@ -194,9 +197,9 @@ export function WaitlistSiteFooter() {
             <Link href="/terms" className="landing-footer-link-btn">
               Terms of Service
             </Link>
-            <button type="button" className="landing-footer-link-btn" disabled>
+            <Link href="/subprocessors" className="landing-footer-link-btn">
               Subprocessors
-            </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,7 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import '@/app/landing-blog.css'
 
-export function BlogNav() {
+type BlogNavProps = {
+  ctaVariant?: 'blue' | 'pink'
+}
+
+export function BlogNav({ ctaVariant = 'blue' }: BlogNavProps) {
   return (
     <nav className="blog-nav">
       <Link href="/" className="blog-logo">
@@ -13,7 +18,10 @@ export function BlogNav() {
       <div className="blog-nav-links">
         <Link href="/">← Home</Link>
       </div>
-      <Link href="/#join" className="blog-nav-cta">
+      <Link
+        href="/#join"
+        className={`blog-nav-cta ${ctaVariant === 'pink' ? 'blog-nav-cta-pink' : ''}`}
+      >
         Join the waitlist
       </Link>
     </nav>

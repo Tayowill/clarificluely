@@ -250,6 +250,16 @@
   margin: 0.5rem 0 0;
 }
 
+.waitlist-footer-subprocessors a {
+  color: #64748b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.waitlist-footer-subprocessors a:hover {
+  color: var(--cl-navy);
+}
+
 @media (max-width: 900px) {
   .waitlist-benefits-grid {
     grid-template-columns: repeat(2, 1fr);
