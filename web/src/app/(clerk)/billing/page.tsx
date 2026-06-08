@@ -15,7 +15,7 @@ const plans = [
   {
     id: 'pro' as const,
     name: 'Pro',
-    price: '$20',
+    price: '$7.99',
     period: '/month',
     features: ['Unlimited sessions', 'AI suggestions', 'Meeting history', 'Playbook editor'],
     checkout: true,
@@ -23,7 +23,7 @@ const plans = [
   {
     id: 'pro_plus' as const,
     name: 'Pro+',
-    price: '$75',
+    price: '$15.99',
     period: '/month',
     features: ['Everything in Pro', 'System audio capture', 'Priority support', 'Early features'],
     checkout: true,

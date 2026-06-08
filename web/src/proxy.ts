@@ -10,6 +10,7 @@ const isPublicRoute = createRouteMatcher([
   '/robots.txt',
   '/auth/callback(.*)',
   '/blog(.*)',
+  '/pricing',
   '/privacy',
   '/terms',
   '/subprocessors',

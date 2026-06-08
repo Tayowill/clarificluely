@@ -16,7 +16,8 @@ export function BlogNav({ ctaVariant = 'blue' }: BlogNavProps) {
         Clarifi
       </Link>
       <div className="blog-nav-links">
-        <Link href="/">← Home</Link>
+        <Link href="/blog">Blog</Link>
+        <Link href="/pricing">Pricing</Link>
       </div>
       <Link
         href="/#join"
