@@ -42,7 +42,10 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
   const post = POSTS[slug]
   if (!post) return { title: 'Blog — Clarifi' }
-  return { title: `${post.title} — Clarifi Blog` }
+  return {
+    title: `${post.title} — Clarifi Blog`,
+    alternates: { canonical: `/blog/${slug}` },
+  }
 }
 
 export default async function BlogPostPage({ params }: PageProps) {

@@ -1,7 +1,12 @@
 import { ClerkProvider } from '@clerk/nextjs'
+import type { Metadata } from 'next'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 

@@ -1,9 +1,14 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { getSiteOrigin } from '@/lib/site-url'
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+}
 
 type HomeProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>

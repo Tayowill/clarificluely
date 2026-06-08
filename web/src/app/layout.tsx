@@ -1,5 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
+import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { getSiteOrigin } from '@/lib/site-url'
 import './globals.css'
 
 const inter = Inter({
@@ -8,7 +10,8 @@ const inter = Inter({
   display: 'swap',
 })
 
-export const metadata = {
+export const metadata: Metadata = {
+  metadataBase: new URL(getSiteOrigin()),
   title: 'Clarifi — Join the Waitlist',
   description: 'The undetectable AI co-pilot for meetings. Launching August 24.',
   icons: {

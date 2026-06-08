@@ -32,6 +32,7 @@ const POSTS = [
 export const metadata = {
   title: 'Blog — Clarifi',
   description: 'News, guides, and product updates from the Clarifi team.',
+  alternates: { canonical: '/blog' },
 }
 
 export default function BlogPage() {

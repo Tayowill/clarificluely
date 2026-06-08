@@ -25,6 +25,7 @@ const SECTIONS = [
 export const metadata = {
   title: 'Privacy Policy — Clarifi',
   description: 'How Clarifi collects, uses, and protects your personal information.',
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPolicyPage() {
