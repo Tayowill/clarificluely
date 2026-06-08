@@ -6,9 +6,9 @@ import { getSiteOrigin } from '@/lib/site-url'
 
 const isPublicRoute = createRouteMatcher([
   '/',
-  '/preview(.*)',
   '/auth/callback(.*)',
   '/blog(.*)',
+  '/privacy',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/sso-callback(.*)',
@@ -25,6 +25,10 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, request) => {
   const { pathname, searchParams } = request.nextUrl
+
+  if (pathname.startsWith('/preview')) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
 
   if (pathname === '/' && searchParams.get('code')) {
     const target = authCallbackRedirectPath(searchParams)

@@ -3,15 +3,26 @@
 type ComingSoonModalProps = {
   open: boolean
   onClose: () => void
+  overlayClassName?: string
+  modalClassName?: string
 }
 
-export function ComingSoonModal({ open, onClose }: ComingSoonModalProps) {
+export function ComingSoonModal({
+  open,
+  onClose,
+  overlayClassName = '',
+  modalClassName = '',
+}: ComingSoonModalProps) {
   if (!open) return null
 
   return (
-    <div className="landing-modal-overlay" onClick={onClose} role="presentation">
+    <div
+      className={`landing-modal-overlay ${overlayClassName}`.trim()}
+      onClick={onClose}
+      role="presentation"
+    >
       <div
-        className="landing-modal"
+        className={`landing-modal ${modalClassName}`.trim()}
         style={{ maxWidth: 400 }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"

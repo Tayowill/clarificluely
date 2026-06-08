@@ -1,6 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { BlogNav } from '@/components/blog/BlogNav'
 import '../../landing-blog.css'
 
 const POSTS: Record<string, { title: string; date: string; readTime: string; body: string[] }> = {
@@ -52,22 +52,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
   return (
     <div className="blog-root">
-      <nav className="blog-nav">
-        <Link href="/" className="blog-logo">
-          <span className="blog-logo-icon">
-            <Image src="/clarifi-logo.png" alt="Clarifi" width={22} height={22} />
-          </span>
-          Clarifi
-        </Link>
-        <div className="blog-nav-links">
-          <Link href="/blog">← Blog</Link>
-          <Link href="/#how-it-works">How it works</Link>
-          <Link href="/#pricing">Pricing</Link>
-        </div>
-        <Link href="/" className="blog-nav-cta">
-          Get for Mac
-        </Link>
-      </nav>
+      <BlogNav />
       <article className="blog-post">
         <h1>{post.title}</h1>
         <p className="blog-post-meta">

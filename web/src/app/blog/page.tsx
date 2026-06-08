@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { BlogNav } from '@/components/blog/BlogNav'
 import '../landing-blog.css'
 
 const POSTS = [
@@ -37,23 +37,7 @@ export const metadata = {
 export default function BlogPage() {
   return (
     <div className="blog-root">
-      <nav className="blog-nav">
-        <Link href="/" className="blog-logo">
-          <span className="blog-logo-icon">
-            <Image src="/clarifi-logo.png" alt="Clarifi" width={22} height={22} />
-          </span>
-          Clarifi
-        </Link>
-        <div className="blog-nav-links">
-          <Link href="/#how-it-works">How it works</Link>
-          <Link href="/#undetectable">Undetectability</Link>
-          <Link href="/#pricing">Pricing</Link>
-          <Link href="/blog">Blog</Link>
-        </div>
-        <Link href="/" className="blog-nav-cta">
-          Get for Mac
-        </Link>
-      </nav>
+      <BlogNav />
 
       <header className="blog-header">
         <h1>Blog</h1>

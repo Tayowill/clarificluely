@@ -1,0 +1,270 @@
+/* Appended waitlist page sections — matches landing design tokens */
+
+.waitlist-page .landing-nav {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 30px rgba(26, 26, 46, 0.04);
+}
+
+.waitlist-page .landing-nav.scrolled {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+}
+
+.waitlist-nav-links {
+  flex: 1;
+  justify-content: center;
+}
+
+.waitlist-benefits {
+  position: relative;
+  padding: 5rem 1.5rem;
+  background: linear-gradient(180deg, #fff 0%, var(--cl-lavender-soft) 100%);
+  overflow: hidden;
+}
+
+.waitlist-benefits::before,
+.waitlist-benefits::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.waitlist-benefits::before {
+  width: 420px;
+  height: 420px;
+  background: rgba(196, 181, 253, 0.35);
+  top: 10%;
+  left: -8%;
+}
+
+.waitlist-benefits::after {
+  width: 360px;
+  height: 360px;
+  background: rgba(251, 207, 232, 0.3);
+  bottom: 5%;
+  right: -6%;
+}
+
+.waitlist-benefits-inner,
+.waitlist-early-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.waitlist-section-heading {
+  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--cl-navy);
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.waitlist-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.waitlist-benefit-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 24px;
+  padding: 1.75rem 1.5rem;
+  box-shadow: 0 8px 32px rgba(26, 26, 46, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.waitlist-benefit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(26, 26, 46, 0.12);
+}
+
+.waitlist-benefit-card:nth-child(1) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(237, 233, 254, 0.5) 100%);
+}
+
+.waitlist-benefit-card:nth-child(2) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(219, 234, 254, 0.5) 100%);
+}
+
+.waitlist-benefit-card:nth-child(3) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(209, 250, 229, 0.45) 100%);
+}
+
+.waitlist-benefit-card:nth-child(4) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(254, 243, 199, 0.45) 100%);
+}
+
+.waitlist-benefit-card:nth-child(5) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(254, 226, 226, 0.4) 100%);
+}
+
+.waitlist-benefit-card:nth-child(6) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(224, 231, 255, 0.5) 100%);
+}
+
+.waitlist-benefit-card-top {
+  margin-bottom: 1rem;
+}
+
+.waitlist-benefit-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f0f0f;
+  box-shadow: 0 2px 8px rgba(15, 15, 15, 0.08);
+}
+
+.waitlist-benefit-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.25;
+}
+
+.waitlist-benefit-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cl-navy);
+  margin-bottom: 0.45rem;
+  line-height: 1.35;
+}
+
+.waitlist-benefit-desc {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #64748b;
+  margin: 0;
+}
+
+.waitlist-early {
+  padding: 5rem 1.5rem;
+  background: #fff;
+}
+
+.waitlist-early-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.5rem;
+}
+
+.waitlist-early-item {
+  text-align: left;
+}
+
+.waitlist-early-num {
+  display: block;
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #cbd5e1;
+  margin-bottom: 0.75rem;
+}
+
+.waitlist-early-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cl-navy);
+  margin-bottom: 0.4rem;
+}
+
+.waitlist-early-text {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #64748b;
+  margin: 0;
+}
+
+.waitlist-site-footer {
+  background: #e8eaf0;
+}
+
+.waitlist-site-footer .landing-footer-logo-text {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.waitlist-site-footer .landing-footer-col h4 {
+  font-weight: 600;
+}
+
+.waitlist-site-footer .landing-footer-col a,
+.waitlist-site-footer .landing-footer-link-btn {
+  font-weight: 400;
+  color: #4b5563;
+}
+
+.waitlist-site-footer .landing-footer-link-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.waitlist-site-footer .landing-footer-link-btn:disabled:hover {
+  color: #4b5563;
+}
+
+.waitlist-site-footer .landing-footer-badge {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.waitlist-frosted-overlay {
+  background: rgba(26, 26, 46, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.waitlist-frosted-modal {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 24px 64px rgba(26, 26, 46, 0.18);
+}
+
+.waitlist-footer-subprocessors {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0.5rem 0 0;
+}
+
+@media (max-width: 900px) {
+  .waitlist-benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .waitlist-benefits-grid,
+  .waitlist-early-row {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .waitlist-benefits,
+  .waitlist-early {
+    padding: 4rem 1.25rem;
+  }
+}

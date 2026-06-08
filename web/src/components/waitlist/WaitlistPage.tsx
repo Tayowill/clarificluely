@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { CLARIFI_INTRO_REPLY, OverlayDemo } from '@/components/landing/OverlayDemo'
@@ -12,6 +13,7 @@ import { fireWaitlistConfetti } from '@/lib/waitlist-confetti'
 import { authCallbackUrl } from '@/lib/site-url'
 import '@/components/landing/landing.css'
 import './waitlist.css'
+import { WaitlistProductSections, WaitlistSiteFooter } from './WaitlistPageSections'
 
 function GoogleIcon() {
   return (
@@ -257,6 +259,11 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
             </span>
             Clarifi
           </a>
+          <div className="landing-nav-links waitlist-nav-links">
+            <Link href="/blog" className="landing-nav-link">
+              Blog
+            </Link>
+          </div>
           <JoinWaitlistButton onClick={scrollToJoin} className="landing-nav-cta" />
         </div>
       </nav>
@@ -291,6 +298,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           />
         </div>
       </section>
+
+      <WaitlistProductSections />
 
       <section className="waitlist-join" id="join">
         <div className="waitlist-join-inner">
@@ -394,6 +403,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           </p>
         </div>
       </section>
+
+      <WaitlistSiteFooter />
     </div>
   )
 }
