@@ -25,6 +25,8 @@ const INVOKE_CHANNELS = [
   'overlay:protection-status',
   'overlay:update-suggestions',
   'audio:status',
+  'audio:prefs-load',
+  'audio:prefs-save',
   'chat:history-load',
   'chat:history-save-session',
   'chat:history-delete-session',
@@ -43,6 +45,23 @@ const INVOKE_CHANNELS = [
   'permissions:status',
   'permissions:request',
   'permissions:open-settings',
+  'prefs:load',
+  'prefs:save',
+  'prefs:set-active-model',
+  'prefs:set-active-mode',
+  'prefs:update-mode-prompt',
+  'prefs:add-model',
+  'prefs:remove-model',
+  'settings:open',
+  'settings:profile',
+  'settings:profile-update',
+  'settings:profile-avatar-upload',
+  'settings:profile-avatar-remove',
+  'settings:open-dashboard',
+  'app:reset-onboarding',
+  'app:logout',
+  'app:quit',
+  'app:erase-account-data',
 ] as const
 
 const EVENT_CHANNELS = [
@@ -51,6 +70,9 @@ const EVENT_CHANNELS = [
   'onboarding:tutorial-event',
   'onboarding:auth-connected',
   'onboarding:mock-nudge',
+  'prefs:changed',
+  'audio:prefs-changed',
+  'settings:tab',
 ] as const
 
 type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

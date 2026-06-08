@@ -36,6 +36,12 @@ export function getBillingUrl(): string {
   return `${base.replace(/\/$/, '')}/billing`
 }
 
+export function getDashboardUrl(): string {
+  const base = getClarifiApiUrl()
+  if (!base) return 'http://localhost:3000/dashboard'
+  return `${base.replace(/\/$/, '')}/dashboard`
+}
+
 function parseAuthToken(url: string): string | null {
   try {
     const parsed = new URL(url)

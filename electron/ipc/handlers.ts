@@ -61,6 +61,30 @@ import {
   saveChatSession,
   type ChatSession,
 } from '../chatHistory'
+import {
+  eraseLocalAccountData,
+  logoutDevice,
+  quitApp,
+  resetOnboardingFlow,
+} from '../accountActions'
+import {
+  loadAudioPreferences,
+  saveAudioPreferences,
+  type AudioPreferences,
+} from '../audioPreferences'
+import { fetchDeviceProfile, getDashboardUrl, updateDeviceProfile } from '../deviceAuth'
+import { removeLocalAvatar, saveLocalAvatar } from '../profileLocal'
+import { normalizeSettingsTab, openSettingsWindow } from '../settings'
+import {
+  addCustomModel,
+  loadUserPreferences,
+  removeCustomModel,
+  setActiveMode,
+  setActiveModel,
+  toPublicPreferences,
+  updateModePrompt,
+  type ModelProvider,
+} from '../userPreferences'
 
 let transcriptLines: string[] = []
 let suggestionCounter = 0
@@ -226,7 +250,7 @@ async function updateSuggestionsForOverlay(
   lines: string[],
 ): Promise<void> {
   suggestionCounter += 1
-  if (suggestionCounter % 3 !== 0) return
+  if (suggestionCounter % 2 !== 0) return
 
   const suggestions = await generateSuggestions(lines)
   const overlay = getOverlayWindow()
@@ -237,8 +261,8 @@ async function updateSuggestionsForOverlay(
 
 function handleTranscript(text: string): void {
   transcriptLines.push(text)
-  if (transcriptLines.length > 20) {
-    transcriptLines = transcriptLines.slice(-20)
+  if (transcriptLines.length > 50) {
+    transcriptLines = transcriptLines.slice(-50)
   }
 
   const overlay = getOverlayWindow()
@@ -422,12 +446,14 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { isRecording: getIsRecording() }
   })
 
-  ipcMain.handle('audio:chunk', async (_event, audioBase64: string) => {
-    const transcript = await processAudioChunk(audioBase64)
-    if (transcript && transcript.length > 2) {
-      handleTranscript(transcript)
-    }
-    return { status: 'ok' }
+  ipcMain.handle('audio:chunk', (_event, audioBase64: string) => {
+    void (async () => {
+      const transcript = await processAudioChunk(audioBase64)
+      if (transcript && transcript.length > 2) {
+        handleTranscript(transcript)
+      }
+    })()
+    return { status: 'processing' }
   })
 
   registerValidatedHandler(
@@ -689,6 +715,199 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
       return { ok: true }
     },
   )
+
+  ipcMain.handle('prefs:load', () => {
+    return toPublicPreferences(loadUserPreferences())
+  })
+
+  registerValidatedHandler(
+    'prefs:set-active-model',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { modelId?: string }
+      if (!payload.modelId || typeof payload.modelId !== 'string') {
+        throw new Error('modelId is required')
+      }
+      return setActiveModel(payload.modelId)
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:set-active-mode',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { modeId?: string }
+      if (!payload.modeId || typeof payload.modeId !== 'string') {
+        throw new Error('modeId is required')
+      }
+      return setActiveMode(payload.modeId)
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:update-mode-prompt',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { modeId?: string; systemPrompt?: string }
+      if (!payload.modeId || typeof payload.modeId !== 'string') {
+        throw new Error('modeId is required')
+      }
+      if (!payload.systemPrompt || typeof payload.systemPrompt !== 'string') {
+        throw new Error('systemPrompt is required')
+      }
+      return updateModePrompt(payload.modeId, payload.systemPrompt)
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:add-model',
+    { requiresInput: true },
+    async (data) => {
+      const payload = data as {
+        label?: string
+        provider?: ModelProvider
+        modelId?: string
+        apiKey?: string
+      }
+      if (!payload.modelId || typeof payload.modelId !== 'string') {
+        throw new Error('modelId is required')
+      }
+      if (!payload.apiKey || typeof payload.apiKey !== 'string') {
+        throw new Error('apiKey is required')
+      }
+      const provider = payload.provider ?? 'anthropic'
+      if (!['anthropic', 'openai', 'gemini', 'groq', 'custom'].includes(provider)) {
+        throw new Error('invalid provider')
+      }
+      await addCustomModel({
+        label: typeof payload.label === 'string' ? payload.label : payload.modelId,
+        provider,
+        modelId: payload.modelId,
+        apiKey: payload.apiKey,
+      })
+      return toPublicPreferences(loadUserPreferences())
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:remove-model',
+    { requiresInput: true },
+    async (data) => {
+      const payload = data as { modelId?: string }
+      if (!payload.modelId || typeof payload.modelId !== 'string') {
+        throw new Error('modelId is required')
+      }
+      return removeCustomModel(payload.modelId)
+    },
+  )
+
+  registerValidatedHandler('settings:profile', {}, async () => {
+    return fetchDeviceProfile()
+  })
+
+  registerValidatedHandler(
+    'settings:profile-update',
+    { requiresInput: true },
+    async (data) => {
+      const payload = data as { firstName?: string; lastName?: string }
+      if (typeof payload.firstName !== 'string' || typeof payload.lastName !== 'string') {
+        throw new Error('firstName and lastName are required')
+      }
+      return updateDeviceProfile({
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+      })
+    },
+  )
+
+  // Avatar uploads bypass sanitizeInput — base64 images exceed the 50KB IPC string cap.
+  ipcMain.handle('settings:profile-avatar-upload', async (_event, data) => {
+    const payload = data as { base64?: string; mimeType?: string }
+    if (!payload?.base64 || typeof payload.base64 !== 'string') {
+      throw new Error('base64 is required')
+    }
+    if (payload.base64.length > 4_000_000) {
+      throw new Error('Image too large (max 3MB)')
+    }
+    const mimeType =
+      typeof payload.mimeType === 'string' && payload.mimeType ? payload.mimeType : 'image/png'
+    saveLocalAvatar(payload.base64, mimeType)
+    return fetchDeviceProfile()
+  })
+
+  registerValidatedHandler('settings:profile-avatar-remove', {}, async () => {
+    removeLocalAvatar()
+    return fetchDeviceProfile()
+  })
+
+  registerValidatedHandler('settings:open-dashboard', {}, async () => {
+    const url = getDashboardUrl()
+    await shell.openExternal(url)
+    return { ok: true, url }
+  })
+
+  registerValidatedHandler(
+    'settings:open',
+    { requiresInput: false },
+    (data) => {
+      const payload = (data ?? {}) as { tab?: string }
+      openSettingsWindow(normalizeSettingsTab(payload.tab))
+      return { ok: true }
+    },
+  )
+
+  ipcMain.handle('audio:prefs-load', () => {
+    return loadAudioPreferences()
+  })
+
+  registerValidatedHandler(
+    'audio:prefs-save',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as Partial<AudioPreferences>
+      const current = loadAudioPreferences()
+      const next: AudioPreferences = {
+        transcriptionLanguage:
+          typeof payload.transcriptionLanguage === 'string'
+            ? payload.transcriptionLanguage
+            : current.transcriptionLanguage,
+        outputLanguage:
+          typeof payload.outputLanguage === 'string'
+            ? payload.outputLanguage
+            : current.outputLanguage,
+        preferredMicrophoneId:
+          typeof payload.preferredMicrophoneId === 'string'
+            ? payload.preferredMicrophoneId
+            : current.preferredMicrophoneId,
+        preferredMicrophoneLabel:
+          typeof payload.preferredMicrophoneLabel === 'string'
+            ? payload.preferredMicrophoneLabel
+            : current.preferredMicrophoneLabel,
+      }
+      saveAudioPreferences(next)
+      return next
+    },
+  )
+
+  registerValidatedHandler('app:reset-onboarding', {}, async () => {
+    await resetOnboardingFlow()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('app:logout', {}, async () => {
+    await logoutDevice()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('app:quit', {}, () => {
+    quitApp()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('app:erase-account-data', {}, async () => {
+    await eraseLocalAccountData()
+    return { ok: true }
+  })
 
   handlersRegistered = true
 }

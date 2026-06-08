@@ -42,6 +42,22 @@ export async function getGroqApiKey(): Promise<string | null> {
   return getKey('groq')
 }
 
+export async function getOpenAiApiKey(): Promise<string | null> {
+  loadRuntimeEnv()
+  if (process.env.OPENAI_API_KEY?.trim()) {
+    return process.env.OPENAI_API_KEY.trim()
+  }
+  return getKey('openai')
+}
+
+export async function getGeminiApiKey(): Promise<string | null> {
+  loadRuntimeEnv()
+  if (process.env.GEMINI_API_KEY?.trim()) {
+    return process.env.GEMINI_API_KEY.trim()
+  }
+  return getKey('gemini')
+}
+
 /** Clarifi cloud API — desktop connects via clarifi:// auth from the website. */
 export function getClarifiApiUrl(): string | null {
   loadRuntimeEnv()

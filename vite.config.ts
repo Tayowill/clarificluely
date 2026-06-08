@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
           main: 'index.html',
           overlay: 'overlay.html',
           onboarding: 'onboarding.html',
+          settings: 'settings.html',
         },
       },
     },

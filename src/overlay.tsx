@@ -45,6 +45,29 @@ type PanelMode = 'bar' | 'chat' | 'history'
 
 type ConnectionState = 'loading' | 'connected' | 'needs_connect' | 'optional'
 
+type ModelConfig = {
+  id: string
+  label: string
+  provider: string
+  modelId: string
+  builtin?: boolean
+}
+
+type ModeConfig = {
+  id: string
+  label: string
+  category?: string
+  systemPrompt: string
+  isActive: boolean
+}
+
+type PublicPreferences = {
+  activeModelId: string
+  models: ModelConfig[]
+  activeModeId: string
+  modes: ModeConfig[]
+}
+
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts
   if (diff < 60_000) return 'just now'
@@ -343,8 +366,11 @@ export default function Overlay() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>('loading')
   const [connectError, setConnectError] = useState('')
+  const [prefs, setPrefs] = useState<PublicPreferences | null>(null)
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chatBodyRef = useRef<HTMLDivElement | null>(null)
+  const modelMenuRef = useRef<HTMLDivElement | null>(null)
 
   const needsConnect = connectionState === 'needs_connect'
 
@@ -407,7 +433,27 @@ export default function Overlay() {
         setSuggestions([...(s as Suggestion[])])
       }
     })
+    window.electronAPI.on('prefs:changed', (next) => {
+      setPrefs(next as PublicPreferences)
+    })
   }, [])
+
+  useEffect(() => {
+    void window.electronAPI.invoke('prefs:load').then((data) => {
+      setPrefs(data as PublicPreferences)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!modelMenuOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setModelMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [modelMenuOpen])
 
   const persistSession = useCallback(
     async (sessionId: string, messages: ChatMessage[]) => {
@@ -598,12 +644,17 @@ export default function Overlay() {
     }
 
     try {
+      const audioPrefs = (await window.electronAPI.invoke('audio:prefs-load')) as {
+        preferredMicrophoneId?: string
+      }
+      const deviceId = audioPrefs?.preferredMicrophoneId?.trim()
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
         },
       })
 
@@ -618,13 +669,11 @@ export default function Overlay() {
         if (event.data.size > 0) {
           const arrayBuffer = await event.data.arrayBuffer()
           const base64 = arrayBufferToBase64(arrayBuffer)
-          setStatus('Transcribing...')
-          await window.electronAPI.invoke('audio:chunk', base64)
-          setStatus('Listening...')
+          void window.electronAPI.invoke('audio:chunk', base64)
         }
       }
 
-      mediaRecorder.start(5000)
+      mediaRecorder.start(2000)
       await window.electronAPI.invoke('audio:start')
       setTranscript([])
       setSuggestions([])
@@ -804,11 +853,63 @@ export default function Overlay() {
     )
   }
 
+  const activeModel =
+    prefs?.models.find((m) => m.id === prefs?.activeModelId) ?? prefs?.models[0] ?? null
+  const activeMode =
+    prefs?.modes.find((m) => m.id === prefs?.activeModeId) ?? prefs?.modes[0] ?? null
+
+  const openSettings = (
+    tab: 'profile' | 'models' | 'modes' | 'integrations' | 'keybinds' | 'audio' = 'profile',
+  ) => {
+    void window.electronAPI.invoke('settings:open', { tab })
+  }
+
   const renderToolbar = () => (
     <div className="overlay-toolbar">
       <div className="toolbar-left">
         <div className={`overlay-dot ${isRecording ? 'recording' : ''}`} />
-        <span className="toolbar-brand">Clarifi</span>
+        <button
+          type="button"
+          className="toolbar-brand toolbar-brand-btn"
+          onClick={() => openSettings('profile')}
+        >
+          Clarifi
+        </button>
+
+        <div className="toolbar-model-wrap" ref={modelMenuRef}>
+          <button
+            type="button"
+            className={`toolbar-pill ${modelMenuOpen ? 'active' : ''}`}
+            onClick={() => setModelMenuOpen((open) => !open)}
+          >
+            <span className="toolbar-pill-label">{activeModel?.label ?? 'Model'}</span>
+            <span className="chevron">▼</span>
+          </button>
+          {modelMenuOpen && (
+            <div className="toolbar-model-menu">
+              <button
+                type="button"
+                className="toolbar-model-item"
+                onClick={() => {
+                  setModelMenuOpen(false)
+                  openSettings('models')
+                }}
+              >
+                Change model
+              </button>
+            </div>
+          )}
+        </div>
+
+        <ToolbarTooltip label="Change mode & system prompt">
+          <button
+            type="button"
+            className="toolbar-pill toolbar-mode-btn"
+            onClick={() => openSettings('modes')}
+          >
+            <span className="toolbar-pill-label">{activeMode?.label ?? 'Mode'}</span>
+          </button>
+        </ToolbarTooltip>
 
         <ToolbarTooltip label="Uses Screen">
           <button
@@ -1084,7 +1185,7 @@ export default function Overlay() {
           {transcript.length > 0 && (
             <div className="expanded-section">
               <div className="expanded-label">Transcript</div>
-              {transcript.slice(-10).map((line, i) => (
+              {transcript.slice(-15).map((line, i) => (
                 <div key={i} className="overlay-transcript-line">
                   {line}
                 </div>

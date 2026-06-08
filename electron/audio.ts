@@ -3,6 +3,7 @@ import * as path from 'path'
 import * as os from 'os'
 import FormData from 'form-data'
 import fetch from 'node-fetch'
+import { getTranscriptionLanguage } from './audioPreferences'
 import { getGroqApiKey } from './keys'
 import { isProxyConfigured, proxyTranscribe } from './proxyClient'
 
@@ -49,10 +50,13 @@ export async function processAudioChunk(audioBase64: string): Promise<string | n
       contentType,
     })
     formData.append('model', 'whisper-large-v3-turbo')
-    formData.append('language', 'en')
+    const language = getTranscriptionLanguage()
+    if (language && language !== 'auto') {
+      formData.append('language', language)
+    }
 
     if (await isProxyConfigured()) {
-      const transcript = await proxyTranscribe(audioBase64, format)
+      const transcript = await proxyTranscribe(audioBase64, format, language)
       fs.unlinkSync(tmpFile)
       if (transcript) console.log('Transcript:', transcript)
       return transcript

@@ -80,10 +80,12 @@ export async function proxySuggest(
 export async function proxyTranscribe(
   audioBase64: string,
   format: 'wav' | 'webm',
+  language = 'en',
 ): Promise<string | null> {
   const { ok, status, data } = await proxyFetch('/api/llm/transcribe', {
     audioBase64,
     format,
+    language,
   })
 
   if (status === 401 || status === 429 || !ok) return null

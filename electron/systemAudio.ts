@@ -8,7 +8,7 @@ let audioBuffer: Buffer[] = []
 let onDataCallback: ((buffer: Buffer) => void) | null = null
 let flushTimer: NodeJS.Timeout | null = null
 
-const FLUSH_INTERVAL_MS = 4000
+const FLUSH_INTERVAL_MS = 2000
 const SAMPLE_RATE = 16000
 const CHANNELS = 1
 const BIT_DEPTH = 16
