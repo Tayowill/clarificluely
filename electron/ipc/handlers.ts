@@ -185,18 +185,28 @@ function sanitizeInput(data: unknown): unknown {
     throw new Error('Input is required')
   }
 
+  if (typeof data === 'number' || typeof data === 'boolean') {
+    return data
+  }
+
   if (typeof data === 'string') {
     return sanitizeString(data)
   }
 
   if (Array.isArray(data)) {
-    return data.map((item) => sanitizeInput(item))
+    return data.map((item) =>
+      item === null || item === undefined ? item : sanitizeInput(item),
+    )
   }
 
   if (typeof data === 'object') {
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      result[key] = sanitizeInput(value)
+      if (value === null || value === undefined) {
+        result[key] = value
+      } else {
+        result[key] = sanitizeInput(value)
+      }
     }
     return result
   }
@@ -507,22 +517,19 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { sessions: loadAudioSessions() }
   })
 
-  registerValidatedHandler(
-    'audio-sessions:save',
-    { requiresInput: true },
-    (data) => {
-      const payload = data as { session?: StoredAudioSession }
-      if (!payload.session || typeof payload.session !== 'object') {
-        throw new Error('session is required')
-      }
-      const session = payload.session
-      if (typeof session.id !== 'string' || typeof session.title !== 'string') {
-        throw new Error('invalid session')
-      }
-      const sessions = saveAudioSession(session)
-      return { sessions }
-    },
-  )
+  // Audio sessions bypass recursive sanitizeInput — recap may be null and transcripts are large.
+  ipcMain.handle('audio-sessions:save', (_event, data) => {
+    const payload = data as { session?: StoredAudioSession }
+    if (!payload?.session || typeof payload.session !== 'object') {
+      throw new Error('session is required')
+    }
+    const session = payload.session
+    if (typeof session.id !== 'string' || typeof session.title !== 'string') {
+      throw new Error('invalid session')
+    }
+    const sessions = saveAudioSession(session)
+    return { sessions }
+  })
 
   registerValidatedHandler(
     'audio-sessions:delete',

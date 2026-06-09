@@ -1136,7 +1136,13 @@ export default function Overlay() {
         }
         setLiveSpeakerLabels(speakerLabels)
       }
-      const recap = (await window.electronAPI.invoke('llm:session-recap')) as SessionRecap | null
+
+      let recap: SessionRecap | null = null
+      try {
+        recap = (await window.electronAPI.invoke('llm:session-recap')) as SessionRecap | null
+      } catch (err) {
+        console.error('Session recap failed:', err)
+      }
       setSessionRecap(recap)
 
       const storedSession: StoredAudioSession = {
@@ -1149,13 +1155,28 @@ export default function Overlay() {
         chatMessages: [],
         speakerLabels: Object.keys(speakerLabels).length > 0 ? speakerLabels : undefined,
       }
-      const saveResult = (await window.electronAPI.invoke('audio-sessions:save', {
-        session: storedSession,
-      })) as { sessions?: StoredAudioSession[] }
-      if (Array.isArray(saveResult?.sessions)) {
-        setAudioSessions(saveResult.sessions)
+
+      try {
+        const saveResult = (await window.electronAPI.invoke('audio-sessions:save', {
+          session: storedSession,
+        })) as { sessions?: StoredAudioSession[] }
+        if (Array.isArray(saveResult?.sessions)) {
+          setAudioSessions(saveResult.sessions)
+          const saved = saveResult.sessions.find((s) => s.id === storedSession.id)
+          setViewingAudioSession(saved ?? storedSession)
+        } else {
+          setViewingAudioSession(storedSession)
+        }
+      } catch (err) {
+        console.error('Failed to save audio session:', err)
+        const reload = (await window.electronAPI.invoke('audio-sessions:load')) as {
+          sessions?: StoredAudioSession[]
+        }
+        if (Array.isArray(reload?.sessions)) {
+          setAudioSessions(reload.sessions)
+        }
+        setViewingAudioSession(storedSession)
       }
-      setViewingAudioSession(storedSession)
       setAudioSessionChatMessages([])
     } finally {
       setRecapLoading(false)
