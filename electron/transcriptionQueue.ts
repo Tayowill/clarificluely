@@ -59,6 +59,9 @@ type SystemChunkWindow = {
 let recentSystemSpeech: SpeechWindow[] = []
 let recentMicSpeech: SpeechWindow[] = []
 let recentSystemChunks: SystemChunkWindow[] = []
+let systemCaptureActiveSince = 0
+
+const SYSTEM_CAPTURE_WARMUP_MS = 3000
 
 export function configureTranscriptionQueue(next: TranscriptionQueueOptions): void {
   options = next
@@ -73,7 +76,24 @@ export function clearTranscriptionQueue(): void {
   recentSystemSpeech = []
   recentMicSpeech = []
   recentSystemChunks = []
+  systemCaptureActiveSince = 0
   options?.onActivity?.('listening')
+}
+
+export function markSystemCaptureActive(): void {
+  systemCaptureActiveSince = Date.now()
+}
+
+export function clearSystemCaptureActive(): void {
+  systemCaptureActiveSince = 0
+}
+
+export function noteSystemAudioEnergy(rms: number, hadEnergy: boolean): void {
+  const at = Date.now()
+  updateSystemChunkWindow(at, rms, hadEnergy)
+  if (hadEnergy) {
+    recordSystemSpeech(at, rms)
+  }
 }
 
 export function isTranscriptionDrainMode(): boolean {
@@ -158,6 +178,30 @@ function updateSystemChunkWindow(at: number, rms: number, hadEnergy: boolean): v
   }
 }
 
+function getMaxRecentSystemRms(at: number): number {
+  const overlapping = recentSystemChunks.filter(
+    (sys) => Math.abs(at - sys.at) <= MIC_BLEED_WINDOW_MS,
+  )
+  if (overlapping.length === 0) return 0
+  return Math.max(...overlapping.map((sys) => sys.rms))
+}
+
+function isSystemCaptureSessionActive(at: number): boolean {
+  return (
+    systemCaptureActiveSince > 0 &&
+    at - systemCaptureActiveSince >= SYSTEM_CAPTURE_WARMUP_MS
+  )
+}
+
+function hasRecentSystemEnergy(at: number): boolean {
+  if (systemSpeechOverlapsMic(at)) return true
+  return recentSystemChunks.some(
+    (sys) =>
+      Math.abs(at - sys.at) <= MIC_BLEED_WINDOW_MS &&
+      (sys.hadEnergy || sys.rms >= SYSTEM_SPEECH_RMS_MIN),
+  )
+}
+
 function resolveMicEntryTarget(chunk: QueuedChunk): {
   speaker: string
   source: TranscriptSource
@@ -167,25 +211,27 @@ function resolveMicEntryTarget(chunk: QueuedChunk): {
   }
 
   const micRms = chunk.rms ?? 0
-  const overlapping = recentSystemChunks.filter(
-    (sys) =>
-      Math.abs(chunk.enqueuedAt - sys.at) <= MIC_BLEED_WINDOW_MS &&
-      (sys.hadEnergy || sys.rms >= SYSTEM_SPEECH_RMS_MIN),
-  )
+  const captureActive = isSystemCaptureSessionActive(chunk.enqueuedAt)
+  const maxSystemRms = getMaxRecentSystemRms(chunk.enqueuedAt)
+  const systemEnergy = hasRecentSystemEnergy(chunk.enqueuedAt)
 
-  if (overlapping.length === 0) {
-    return { speaker: 'Me', source: 'mic' }
-  }
-
-  const maxSystemRms = Math.max(...overlapping.map((sys) => sys.rms), SYSTEM_SPEECH_RMS_MIN)
-  const userSpeaking =
-    micRms >= MIC_USER_SPEECH_RMS && micRms >= maxSystemRms * 2.2
+  const userSpeaking = captureActive
+    ? micRms >= 0.04 &&
+      micRms >= Math.max(maxSystemRms, SYSTEM_SPEECH_RMS_MIN) * 2
+    : micRms >= MIC_USER_SPEECH_RMS
 
   if (userSpeaking) {
     return { speaker: 'Me', source: 'mic' }
   }
 
-  return { speaker: 'Them', source: 'system' }
+  const speakerBleedRange =
+    micRms >= MIC_SPEECH_RMS_MIN && micRms < (captureActive ? 0.04 : MIC_USER_SPEECH_RMS)
+
+  if (systemEnergy || (captureActive && speakerBleedRange)) {
+    return { speaker: 'Them', source: 'system' }
+  }
+
+  return { speaker: 'Me', source: 'mic' }
 }
 
 function hasRecentSpeech(): boolean {

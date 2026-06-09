@@ -10,6 +10,8 @@ import {
   resumeRecording,
   startRecording,
   stopRecording,
+  wavHasSpeechEnergy,
+  wavRms,
 } from '../audio'
 import {
   getOverlayWindow,
@@ -47,10 +49,13 @@ import {
   type StoredAudioSession,
 } from '../audioSessionHistory'
 import {
+  clearSystemCaptureActive,
   clearTranscriptionQueue,
   configureTranscriptionQueue,
   enqueueTranscription,
   flushTranscriptionQueue,
+  markSystemCaptureActive,
+  noteSystemAudioEnergy,
 } from '../transcriptionQueue'
 import {
   entriesToLines,
@@ -741,10 +746,15 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
 
     if (process.platform === 'darwin') {
       onSystemAudioData = (wavBuffer: Buffer) => {
+        const rms = wavRms(wavBuffer)
+        const hadEnergy = wavHasSpeechEnergy(wavBuffer)
+        noteSystemAudioEnergy(rms, hadEnergy)
         const base64 = wavBuffer.toString('base64')
         enqueueAudioChunk(base64, 'system')
       }
-      startSystemAudio(onSystemAudioData)
+      if (startSystemAudio(onSystemAudioData)) {
+        markSystemCaptureActive()
+      }
     }
 
     return { status: 'started' }
@@ -753,19 +763,23 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
   ipcMain.handle('audio:pause', () => {
     pauseRecording()
     stopSystemAudio()
+    clearSystemCaptureActive()
     return { status: 'paused', isPaused: getIsPaused() }
   })
 
   ipcMain.handle('audio:resume', () => {
     resumeRecording()
     if (process.platform === 'darwin' && onSystemAudioData) {
-      startSystemAudio(onSystemAudioData)
+      if (startSystemAudio(onSystemAudioData)) {
+        markSystemCaptureActive()
+      }
     }
     return { status: 'resumed', isPaused: getIsPaused() }
   })
 
   ipcMain.handle('audio:stop', async () => {
     stopSystemAudio()
+    clearSystemCaptureActive()
     stopRecording()
     onSystemAudioData = null
     await flushTranscriptionQueue()
