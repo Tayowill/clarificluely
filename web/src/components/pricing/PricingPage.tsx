@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { PRICING_FEATURES, getPricingPlans } from '@/lib/pricing'
 import '@/components/landing/landing.css'
@@ -38,19 +38,12 @@ function XIcon() {
 export function PricingPage() {
   const searchParams = useSearchParams()
   const checkoutSuccess = searchParams.get('checkout') === 'success'
-  const [navScrolled, setNavScrolled] = useState(false)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const plans = getPricingPlans()
 
-  useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
   return (
     <div className="landing-root pricing-page">
-      <MarketingNav active="pricing" scrolled={navScrolled} />
+      <MarketingNav active="pricing" showBack />
 
       <main className="pricing-main">
         <div className="pricing-hero-glow pricing-hero-glow-a" aria-hidden />

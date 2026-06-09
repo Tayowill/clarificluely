@@ -7,6 +7,7 @@ import { ComingSoonModal } from './ComingSoonModal'
 import { InstallModal } from './InstallModal'
 import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
 import { ScreenShareCompare } from './ScreenShareCompare'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
 import '@/components/waitlist/waitlist.css'
 import './landing.css'
 
@@ -214,18 +215,11 @@ function MoveOverlayDemo({ demoRef }: { demoRef: RefObject<OverlayDemoHandle | n
 
 export function LandingPage({ macDownloadUrl }: LandingPageProps) {
   const moveDemoRef = useRef<OverlayDemoHandle>(null)
-  const [navScrolled, setNavScrolled] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   useScrollReveal()
-
-  useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   const triggerDownload = useCallback(() => {
     const a = document.createElement('a')
@@ -241,42 +235,9 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
     window.location.href = '/#join'
   }, [])
 
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   return (
-    <div className="landing-root">
-      <nav className={`landing-nav ${navScrolled ? 'scrolled' : ''}`}>
-        <div className="landing-nav-inner">
-          <Link href="/" className="landing-nav-logo">
-            <span className="landing-nav-logo-icon">
-              <ClarifiLogo />
-            </span>
-            Clarifi
-          </Link>
-
-          <div className="landing-nav-links">
-            <button type="button" className="landing-nav-link" onClick={() => scrollTo('how-it-works')}>
-              How it works
-            </button>
-            <button type="button" className="landing-nav-link" onClick={() => scrollTo('undetectable')}>
-              Undetectability
-            </button>
-            <button type="button" className="landing-nav-link" onClick={() => scrollTo('pricing')}>
-              Pricing
-            </button>
-            <button type="button" className="landing-nav-link" onClick={() => setMobileOpen(true)}>
-              Mobile
-            </button>
-            <Link href="/blog" className="landing-nav-link">
-              Blog
-            </Link>
-          </div>
-
-          <JoinWaitlistButton onClick={joinWaitlist} className="landing-nav-cta" />
-        </div>
-      </nav>
+    <div className="landing-root waitlist-page">
+      <MarketingNav />
 
       {/* Hero */}
       <section className="landing-hero">

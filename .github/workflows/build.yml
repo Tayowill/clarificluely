@@ -4,10 +4,15 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'web/**'
+      - '**.md'
   workflow_dispatch:
 
 env:
   NODE_VERSION: 20
+  SKIP_NATIVE_REBUILD: '1'
+  SKIP_NOTARIZE: '1'
 
 jobs:
   build-mac:

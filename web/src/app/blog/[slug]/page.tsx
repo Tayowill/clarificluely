@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BlogNav } from '@/components/blog/BlogNav'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { BlogPostContent } from '@/components/blog/BlogPostContent'
 import { BLOG_POST_SLUGS, getBlogPost } from '@/lib/blog-posts'
 import '../../landing-blog.css'
@@ -84,7 +84,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   return (
     <div className="blog-root">
       <FaqJsonLd slug={slug} />
-      <BlogNav />
+      <MarketingNav active="blog" showBack />
       <article className="blog-post">
         <h1>{post.title}</h1>
         <p className="blog-post-meta">

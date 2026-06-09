@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BlogNav } from '@/components/blog/BlogNav'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
 import '../legal.css'
 
 const CONTACT_EMAIL = 'tayowilliams23@gmail.com'
@@ -29,7 +29,7 @@ export const metadata = {
 export default function TermsOfServicePage() {
   return (
     <div className="legal-root">
-      <BlogNav ctaVariant="pink" />
+      <MarketingNav />
 
       <div className="legal-layout">
         <main className="legal-main">

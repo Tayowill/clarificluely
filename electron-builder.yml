@@ -7,17 +7,17 @@ directories:
 files:
   - dist/**/*
   - dist-electron/**/*
-extraResources:
-  - from: resources/audio-capture-helper
-    to: audio-capture-helper
-    filter:
-      - "**/*"
-  - from: resources/window_capture_exclude.node
-    to: window_capture_exclude.node
-    filter:
-      - "**/*"
 afterSign: scripts/notarize.cjs
 mac:
+  extraResources:
+    - from: resources/audio-capture-helper
+      to: audio-capture-helper
+      filter:
+        - "**/*"
+    - from: resources/window_capture_exclude.node
+      to: window_capture_exclude.node
+      filter:
+        - "**/*"
   target:
     - dmg
     - zip

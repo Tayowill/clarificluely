@@ -5,10 +5,29 @@
   font-family: var(--font-inter, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 }
 
+.legal-root .landing-nav {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 30px rgba(26, 26, 46, 0.04);
+}
+
+.legal-root .landing-nav.scrolled {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+}
+
+.legal-root .landing-nav-inner {
+  max-width: 1100px;
+}
+
 .legal-layout {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 3rem 2rem 5rem;
+  padding: 6.5rem 2rem 5rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;
   gap: 3rem;

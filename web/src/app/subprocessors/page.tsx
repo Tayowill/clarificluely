@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BlogNav } from '@/components/blog/BlogNav'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { SUBPROCESSORS } from '@/lib/subprocessors'
 import '../legal.css'
 
@@ -12,7 +12,7 @@ export const metadata = {
 export default function SubprocessorsPage() {
   return (
     <div className="legal-root">
-      <BlogNav ctaVariant="pink" />
+      <MarketingNav />
 
       <div className="legal-layout legal-layout-single">
         <main className="legal-main">

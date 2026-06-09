@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "Skipping Swift audio helper (macOS only)"
+  exit 0
+fi
+
 ARCH=$(uname -m)
 if [ "$ARCH" = "arm64" ]; then
   TARGET="arm64-apple-macosx13.0"

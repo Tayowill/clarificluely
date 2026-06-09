@@ -5,8 +5,11 @@
   --cl-blue-hover: #1a5ae8;
   --cl-navy: #1a1a2e;
   --cl-charcoal: #1c1c2e;
-  --cl-lavender: #dde2ee;
-  --cl-lavender-soft: #eef1f8;
+  --cl-lavender: hsl(250, 43%, 88%);
+  --cl-lavender-soft: hsl(250, 40%, 90%);
+  --cl-lavender-mid: hsl(250, 42%, 89%);
+  --cl-rose-soft: hsl(350, 42%, 87%);
+  --cl-frost-veil: rgba(255, 255, 255, 0.12);
   --cl-muted: #6b7280;
   --cl-border: #e8ecf4;
   --cl-card: #f7f8fc;
@@ -24,7 +27,7 @@
   right: 0;
   z-index: 50;
   padding: 0.85rem 2rem;
-  background: rgba(221, 226, 238, 0.55);
+  background: hsl(250 43% 88% / 0.55);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border-bottom: 1px solid rgba(255, 255, 255, 0.45);
@@ -43,6 +46,24 @@
   display: flex;
   align-items: center;
   gap: 2rem;
+}
+
+.landing-nav-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  color: var(--cl-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+}
+
+.landing-nav-back:hover {
+  color: var(--cl-navy);
+  background: rgba(26, 26, 46, 0.06);
 }
 
 .landing-nav-logo {
@@ -157,7 +178,11 @@
   position: relative;
   padding: 7.5rem 2rem 5rem;
   text-align: center;
-  background: linear-gradient(180deg, var(--cl-lavender) 0%, #e8edf6 40%, #fff 100%);
+  background:
+    linear-gradient(var(--cl-frost-veil), var(--cl-frost-veil)),
+    radial-gradient(ellipse 90% 72% at 0% 0%, hsl(250 43% 87% / 0.92) 0%, transparent 58%),
+    radial-gradient(ellipse 78% 68% at 100% 100%, hsl(350 42% 87% / 0.78) 0%, transparent 56%),
+    linear-gradient(155deg, var(--cl-lavender) 0%, var(--cl-lavender-mid) 42%, hsl(0, 0%, 97.5%) 100%);
   overflow: hidden;
 }
 
@@ -166,22 +191,24 @@
   border-radius: 50%;
   filter: blur(80px);
   pointer-events: none;
+  z-index: 0;
 }
 
 .landing-hero-glow-a {
   width: 500px;
   height: 500px;
-  background: rgba(196, 181, 253, 0.35);
+  background: hsl(250 50% 78% / 0.44);
   top: 10%;
   left: -10%;
 }
 
 .landing-hero-glow-b {
-  width: 400px;
-  height: 400px;
-  background: rgba(251, 207, 232, 0.3);
-  top: 20%;
-  right: -5%;
+  width: 440px;
+  height: 440px;
+  background: hsl(350 45% 84% / 0.4);
+  bottom: -8%;
+  right: -6%;
+  top: auto;
 }
 
 .landing-hero-content {

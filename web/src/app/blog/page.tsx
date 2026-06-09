@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { BlogNav } from '@/components/blog/BlogNav'
+import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { BLOG_POSTS } from '@/lib/blog-posts'
 import '../landing-blog.css'
 
@@ -14,7 +14,7 @@ export const metadata = {
 export default function BlogPage() {
   return (
     <div className="blog-root">
-      <BlogNav />
+      <MarketingNav active="blog" showBack />
 
       <header className="blog-header">
         <h1>Blog</h1>

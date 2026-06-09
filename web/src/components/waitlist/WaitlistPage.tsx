@@ -86,16 +86,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
     'idle',
   )
   const [message, setMessage] = useState('')
-  const [navScrolled, setNavScrolled] = useState(false)
-
   const scrollToJoin = useCallback(() => {
     document.getElementById('join')?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
-
-  useEffect(() => {
-    const onScroll = () => setNavScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   useEffect(() => {
@@ -250,7 +242,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
 
   return (
     <div className="landing-root waitlist-page">
-      <MarketingNav scrolled={navScrolled} />
+      <MarketingNav />
 
       <section className="landing-hero">
         <div className="landing-hero-glow landing-hero-glow-a" aria-hidden />
