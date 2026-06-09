@@ -1,7 +1,11 @@
 import { app, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import { DEFAULT_MODES } from './modes/defaultModes'
+import {
+  buildCustomModePrompt,
+  DEFAULT_MODES,
+  isBuiltinModeId,
+} from './modes/defaultModes'
 import { deleteKey, getKey, saveKey } from './store'
 
 export type ModelProvider = 'anthropic' | 'openai' | 'gemini' | 'groq' | 'custom'
@@ -20,6 +24,8 @@ export type ModeConfig = {
   category?: string
   systemPrompt: string
   isActive: boolean
+  transcriptionMode?: 'dual' | 'group'
+  builtin?: boolean
 }
 
 export type UserPreferences = {
@@ -222,19 +228,17 @@ function mergeModes(stored: ModeConfig[]): ModeConfig[] {
   const byId = new Map(stored.map((m) => [m.id, m]))
   const merged = DEFAULT_MODES.map((defaults) => {
     const existing = byId.get(defaults.id)
-    if (!existing) return { ...defaults }
     return {
       ...defaults,
-      ...existing,
-      label: existing.label || defaults.label,
-      category: existing.category || defaults.category,
-      systemPrompt: existing.systemPrompt || defaults.systemPrompt,
+      isActive: existing?.isActive ?? defaults.isActive,
     }
   })
   for (const mode of stored) {
-    if (!merged.some((m) => m.id === mode.id)) {
-      merged.push(mode)
-    }
+    if (isBuiltinModeId(mode.id)) continue
+    merged.push({
+      ...mode,
+      builtin: false,
+    })
   }
   return merged
 }
@@ -318,10 +322,13 @@ export function getActiveModel(prefs = loadUserPreferences()): ModelConfig {
 }
 
 export function getActiveMode(prefs = loadUserPreferences()): ModeConfig {
+  const active = prefs.modes.find(
+    (m) => m.id === prefs.activeModeId && !m.transcriptionMode,
+  )
+  if (active) return active
   return (
-    prefs.modes.find((m) => m.id === prefs.activeModeId) ??
     prefs.modes.find((m) => m.id === 'general') ??
-    DEFAULT_MODES[0]
+    DEFAULT_MODES.find((m) => m.id === 'general')!
   )
 }
 
@@ -375,39 +382,48 @@ export function setActiveModel(modelId: string): PublicPreferences {
 
 export function setActiveMode(modeId: string): PublicPreferences {
   const prefs = loadUserPreferences()
-  if (prefs.modes.some((m) => m.id === modeId)) {
-    prefs.activeModeId = modeId
-    saveUserPreferences(prefs)
-  }
-  return toPublicPreferences(prefs)
-}
-
-export function updateModePrompt(modeId: string, systemPrompt: string): PublicPreferences {
-  const prefs = loadUserPreferences()
   const mode = prefs.modes.find((m) => m.id === modeId)
-  if (mode) {
-    mode.systemPrompt = systemPrompt
-    saveUserPreferences(prefs)
+  if (!mode || mode.transcriptionMode) {
+    return toPublicPreferences(prefs)
   }
+  prefs.activeModeId = modeId
+  saveUserPreferences(prefs)
   return toPublicPreferences(prefs)
 }
 
 export function createMode(input: {
   label: string
   category?: string
-  systemPrompt?: string
+  description?: string
 }): PublicPreferences {
   const prefs = loadUserPreferences()
+  const label = input.label.trim() || 'Custom Mode'
   const id = `mode-${Date.now()}`
   prefs.modes.push({
     id,
-    label: input.label.trim() || 'New Mode',
+    label,
     category: input.category?.trim() || 'Custom',
-    systemPrompt:
-      input.systemPrompt?.trim() ||
-      'You are Clarifi. Help the user in this context with brief, speakable suggestions.',
+    systemPrompt: buildCustomModePrompt(label, input.description),
     isActive: false,
+    builtin: false,
   })
+  saveUserPreferences(prefs)
+  return toPublicPreferences(prefs)
+}
+
+export function removeCustomMode(modeId: string): PublicPreferences {
+  const prefs = loadUserPreferences()
+  if (isBuiltinModeId(modeId)) {
+    return toPublicPreferences(prefs)
+  }
+  const mode = prefs.modes.find((m) => m.id === modeId)
+  if (!mode || mode.builtin) {
+    return toPublicPreferences(prefs)
+  }
+  prefs.modes = prefs.modes.filter((m) => m.id !== modeId)
+  if (prefs.activeModeId === modeId) {
+    prefs.activeModeId = 'general'
+  }
   saveUserPreferences(prefs)
   return toPublicPreferences(prefs)
 }

@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import { applyMacCaptureExclusion } from './windowCaptureExclude'
 import {
   OVERLAY_HEIGHT_COLLAPSED,
   OVERLAY_HEIGHT_EXPANDED,
@@ -33,12 +34,8 @@ type OverlaySettings = {
 let contentProtectionEnabled = true
 
 /**
- * STEALTH_LIMITATIONS (macOS):
- * Google Meet and Chrome use ScreenCaptureKit, which may capture the overlay
- * despite setContentProtection(true). Electron sets NSWindowSharingNone but
- * ScreenCaptureKit composites the display framebuffer directly on macOS 14+.
- * We re-apply protection after workspace visibility changes and try IOSurfaceCapturer
- * disable in main.ts — Meet may still show the overlay on some macOS versions.
+ * Stealth uses setContentProtection (legacy capture) plus CGSSetWindowCaptureExcludeShape
+ * via native/window_capture_exclude.node on macOS 15+ ScreenCaptureKit paths.
  */
 
 function getSettingsFilePath(): string {
@@ -79,6 +76,20 @@ function applyContentProtection(window: BrowserWindow): void {
   if (process.platform === 'darwin' || process.platform === 'win32') {
     window.setContentProtection(contentProtectionEnabled)
   }
+  if (process.platform === 'darwin' && !window.isDestroyed()) {
+    const handle = window.getNativeWindowHandle()
+    const applied = applyMacCaptureExclusion(handle, contentProtectionEnabled)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[stealth] CGS capture exclude=', contentProtectionEnabled, 'applied=', applied)
+    }
+  }
+}
+
+function broadcastProtectionState(): void {
+  const payload = { enabled: contentProtectionEnabled }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay:protection-changed', payload)
+  }
 }
 
 /** Follow ON: visible on all Spaces. Pin ON: stays on current Space only. */
@@ -100,6 +111,7 @@ function applyWorkspaceVisibility(window: BrowserWindow): void {
 export function reapplyOverlayWindowPolicies(): void {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     applyOverlayWindowPolicies(overlayWindow)
+    broadcastProtectionState()
   }
 }
 
@@ -122,8 +134,17 @@ export function setContentProtectionEnabled(enabled: boolean): void {
   }
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     applyOverlayWindowPolicies(overlayWindow)
+    if (process.platform === 'darwin') {
+      setTimeout(() => {
+        if (overlayWindow && !overlayWindow.isDestroyed()) {
+          applyContentProtection(overlayWindow)
+          broadcastProtectionState()
+        }
+      }, 120)
+    }
   }
   saveOverlaySettings()
+  broadcastProtectionState()
 }
 
 export function toggleContentProtection(): boolean {
@@ -199,6 +220,12 @@ export function createOverlayWindow(): BrowserWindow {
   startOverlayFollow(overlayWindow)
   applyOverlayWindowPolicies(overlayWindow)
 
+  overlayWindow.on('resize', () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      applyContentProtection(overlayWindow)
+    }
+  })
+
   overlayWindow.on('show', () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       applyOverlayWindowPolicies(overlayWindow)
@@ -250,6 +277,13 @@ export function toggleOverlayVisibility(): void {
     overlayWindow.showInactive()
     applyOverlayWindowPolicies(overlayWindow)
   }
+}
+
+export function nudgeOverlayWindow(dx: number, dy: number): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  const bounds = overlayWindow.getBounds()
+  const position = clampPosition(bounds.x + dx, bounds.y + dy, bounds.width, bounds.height)
+  setOverlayBounds(overlayWindow, position.x, position.y, bounds.width, bounds.height, true)
 }
 
 export function setOverlayInteractive(interactive: boolean): void {

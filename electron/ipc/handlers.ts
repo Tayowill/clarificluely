@@ -129,12 +129,13 @@ import { removeLocalAvatar, saveLocalAvatar } from '../profileLocal'
 import { normalizeSettingsTab, openSettingsWindow } from '../settings'
 import {
   addCustomModel,
+  createMode,
   loadUserPreferences,
+  removeCustomMode,
   removeCustomModel,
   setActiveMode,
   setActiveModel,
   toPublicPreferences,
-  updateModePrompt,
   type ModelProvider,
 } from '../userPreferences'
 
@@ -667,14 +668,28 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { enabled: isOverlayFollowEnabled() }
   })
 
-  ipcMain.handle('overlay:toggle-protection', (_event, enabled?: boolean) => {
-    if (typeof enabled === 'boolean') {
-      setContentProtectionEnabled(enabled)
-    } else {
-      toggleContentProtection()
-    }
-    return { enabled: isContentProtectionEnabled() }
-  })
+  ipcMain.handle(
+    'overlay:toggle-protection',
+    (_event, payload?: boolean | { enabled?: boolean }) => {
+      let enabled: boolean | undefined
+      if (typeof payload === 'boolean') {
+        enabled = payload
+      } else if (
+        payload &&
+        typeof payload === 'object' &&
+        typeof payload.enabled === 'boolean'
+      ) {
+        enabled = payload.enabled
+      }
+
+      if (typeof enabled === 'boolean') {
+        setContentProtectionEnabled(enabled)
+      } else {
+        toggleContentProtection()
+      }
+      return { enabled: isContentProtectionEnabled() }
+    },
+  )
 
   ipcMain.handle('overlay:protection-status', () => {
     return { enabled: isContentProtectionEnabled() }
@@ -1097,17 +1112,30 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
   )
 
   registerValidatedHandler(
-    'prefs:update-mode-prompt',
+    'prefs:add-mode',
     { requiresInput: true },
     (data) => {
-      const payload = data as { modeId?: string; systemPrompt?: string }
+      const payload = data as { label?: string; category?: string; description?: string }
+      if (!payload.label || typeof payload.label !== 'string' || !payload.label.trim()) {
+        throw new Error('label is required')
+      }
+      return createMode({
+        label: payload.label,
+        category: typeof payload.category === 'string' ? payload.category : undefined,
+        description: typeof payload.description === 'string' ? payload.description : undefined,
+      })
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:remove-mode',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { modeId?: string }
       if (!payload.modeId || typeof payload.modeId !== 'string') {
         throw new Error('modeId is required')
       }
-      if (!payload.systemPrompt || typeof payload.systemPrompt !== 'string') {
-        throw new Error('systemPrompt is required')
-      }
-      return updateModePrompt(payload.modeId, payload.systemPrompt)
+      return removeCustomMode(payload.modeId)
     },
   )
 

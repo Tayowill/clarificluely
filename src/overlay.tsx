@@ -781,26 +781,39 @@ export default function Overlay() {
     }
   }, [])
 
-  useEffect(() => {
-    void Promise.all([
+  const syncToolbarPrefs = useCallback(async () => {
+    const [follow, protection, screen] = await Promise.all([
       window.electronAPI.invoke('overlay:follow-status'),
       window.electronAPI.invoke('overlay:protection-status'),
       window.electronAPI.invoke('screen:context-status'),
-    ]).then(([follow, protection, screen]) => {
-      const followResult = follow as { enabled?: boolean }
-      const protectionResult = protection as { enabled?: boolean }
-      const screenResult = screen as { enabled?: boolean }
-      if (typeof followResult?.enabled === 'boolean') {
-        setFollowEnabled(followResult.enabled)
-      }
-      if (typeof protectionResult?.enabled === 'boolean') {
-        setStealthEnabled(protectionResult.enabled)
-      }
-      if (typeof screenResult?.enabled === 'boolean') {
-        setScreenContextEnabled(screenResult.enabled)
+    ])
+    const followResult = follow as { enabled?: boolean }
+    const protectionResult = protection as { enabled?: boolean }
+    const screenResult = screen as { enabled?: boolean }
+    if (typeof followResult?.enabled === 'boolean') {
+      setFollowEnabled(followResult.enabled)
+    }
+    if (typeof protectionResult?.enabled === 'boolean') {
+      setStealthEnabled(protectionResult.enabled)
+    }
+    if (typeof screenResult?.enabled === 'boolean') {
+      setScreenContextEnabled(screenResult.enabled)
+    }
+  }, [])
+
+  useEffect(() => {
+    void syncToolbarPrefs()
+    window.electronAPI.on('overlay:protection-changed', (payload) => {
+      const next = payload as { enabled?: boolean }
+      if (typeof next?.enabled === 'boolean') {
+        setStealthEnabled(next.enabled)
       }
     })
-  }, [])
+  }, [syncToolbarPrefs])
+
+  useEffect(() => {
+    void syncToolbarPrefs()
+  }, [panelMode, syncToolbarPrefs])
 
   const checkScroll = useCallback(() => {
     const el = chatBodyRef.current
@@ -867,11 +880,17 @@ export default function Overlay() {
   }
 
   const toggleStealth = async () => {
-    const result = (await window.electronAPI.invoke('overlay:toggle-protection')) as {
-      enabled?: boolean
-    }
-    if (typeof result?.enabled === 'boolean') {
-      setStealthEnabled(result.enabled)
+    const next = !stealthEnabled
+    setStealthEnabled(next)
+    try {
+      const result = (await window.electronAPI.invoke('overlay:toggle-protection', {
+        enabled: next,
+      })) as { enabled?: boolean }
+      if (typeof result?.enabled === 'boolean') {
+        setStealthEnabled(result.enabled)
+      }
+    } catch {
+      setStealthEnabled(!next)
     }
   }
 
@@ -2181,6 +2200,8 @@ export default function Overlay() {
           <button
             type="button"
             className={`toolbar-icon stealth-btn ${stealthEnabled ? 'active' : ''}`}
+            aria-pressed={stealthEnabled}
+            aria-label={stealthEnabled ? 'Hidden from share' : 'Detectable on share'}
             onClick={() => void toggleStealth()}
           >
             {stealthEnabled ? (

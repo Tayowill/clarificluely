@@ -18,6 +18,12 @@ type ModeConfig = {
   category?: string
   systemPrompt: string
   isActive: boolean
+  builtin?: boolean
+}
+
+function isCustomMode(mode: ModeConfig): boolean {
+  if (mode.builtin === true) return false
+  return mode.builtin === false || mode.id.startsWith('mode-')
 }
 
 type PublicPreferences = {
@@ -340,9 +346,13 @@ export default function SettingsApp() {
   const [draftLastName, setDraftLastName] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [permissions, setPermissions] = useState<PermissionState | null>(null)
-  const [selectedModeId, setSelectedModeId] = useState<string | null>(null)
-  const [draftPrompt, setDraftPrompt] = useState('')
   const [showAddModel, setShowAddModel] = useState(false)
+  const [showAddMode, setShowAddMode] = useState(false)
+  const [newMode, setNewMode] = useState({
+    label: '',
+    category: '',
+    description: '',
+  })
   const [expandedProviders, setExpandedProviders] = useState<Set<ModelProvider>>(
     () => new Set(['anthropic', 'openai', 'gemini']),
   )
@@ -381,15 +391,10 @@ export default function SettingsApp() {
     try {
       const data = (await window.electronAPI.invoke('prefs:load')) as PublicPreferences
       setPrefs(data)
-      if (!selectedModeId && data.modes.length > 0) {
-        const active = data.modes.find((m) => m.id === data.activeModeId) ?? data.modes[0]
-        setSelectedModeId(active.id)
-        setDraftPrompt(active.systemPrompt)
-      }
     } finally {
       setPrefsLoading(false)
     }
-  }, [selectedModeId])
+  }, [])
 
   const loadProfile = useCallback(async () => {
     const data = (await window.electronAPI.invoke('settings:profile')) as DeviceProfile
@@ -500,12 +505,9 @@ export default function SettingsApp() {
       applyKeybindPrefs(payload as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences })
     })
     window.electronAPI.on('prefs:changed', (next) => {
-      const data = next as PublicPreferences
-      setPrefs(data)
-      const mode = data.modes.find((m) => m.id === selectedModeId)
-      if (mode) setDraftPrompt(mode.systemPrompt)
+      setPrefs(next as PublicPreferences)
     })
-  }, [loadPrefs, loadProfile, loadPermissions, loadAudioPrefs, loadChatHistory, loadAudioSessions, loadKeybindPrefs, applyKeybindPrefs, selectedModeId])
+  }, [loadPrefs, loadProfile, loadPermissions, loadAudioPrefs, loadChatHistory, loadAudioSessions, loadKeybindPrefs, applyKeybindPrefs])
 
   useEffect(() => {
     if (!recordingKeybindId) return
@@ -548,11 +550,6 @@ export default function SettingsApp() {
     }
   }, [tab, refreshMicDevices])
 
-  const selectedMode = useMemo(
-    () => prefs?.modes.find((m) => m.id === selectedModeId) ?? null,
-    [prefs, selectedModeId],
-  )
-
   const modeGroups = useMemo(
     () => (prefs ? groupModesByCategory(prefs.modes) : new Map()),
     [prefs],
@@ -583,23 +580,25 @@ export default function SettingsApp() {
     })
   }
 
-  const selectMode = (mode: ModeConfig) => {
-    setSelectedModeId(mode.id)
-    setDraftPrompt(mode.systemPrompt)
-  }
-
   const activateMode = async (modeId: string) => {
     const data = (await window.electronAPI.invoke('prefs:set-active-mode', { modeId })) as PublicPreferences
     setPrefs(data)
-    selectMode(data.modes.find((m) => m.id === modeId) ?? data.modes[0])
   }
 
-  const savePrompt = async () => {
-    if (!selectedModeId) return
-    const data = (await window.electronAPI.invoke('prefs:update-mode-prompt', {
-      modeId: selectedModeId,
-      systemPrompt: draftPrompt,
+  const addMode = async () => {
+    if (!newMode.label.trim()) return
+    const data = (await window.electronAPI.invoke('prefs:add-mode', {
+      label: newMode.label.trim(),
+      category: newMode.category.trim() || undefined,
+      description: newMode.description.trim() || undefined,
     })) as PublicPreferences
+    setPrefs(data)
+    setShowAddMode(false)
+    setNewMode({ label: '', category: '', description: '' })
+  }
+
+  const removeMode = async (modeId: string) => {
+    const data = (await window.electronAPI.invoke('prefs:remove-mode', { modeId })) as PublicPreferences
     setPrefs(data)
   }
 
@@ -1305,13 +1304,15 @@ export default function SettingsApp() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              type="button"
-                              className="settings-btn small"
-                              onClick={() => selectMode(mode)}
-                            >
-                              Edit prompt
-                            </button>
+                            {isCustomMode(mode) && (
+                              <button
+                                type="button"
+                                className="settings-btn small"
+                                onClick={() => void removeMode(mode.id)}
+                              >
+                                Delete
+                              </button>
+                            )}
                             {prefs.activeModeId !== mode.id && (
                               <button
                                 type="button"
@@ -1328,19 +1329,71 @@ export default function SettingsApp() {
                   </div>
                 ))}
 
-                {selectedMode && (
-                  <div className="settings-card" style={{ marginTop: 20 }}>
-                    <div className="settings-card-title" style={{ marginBottom: 10 }}>
-                      System prompt — {selectedMode.label}
+                {!showAddMode ? (
+                  <button
+                    type="button"
+                    className="settings-btn"
+                    style={{ marginTop: 12 }}
+                    onClick={() => setShowAddMode(true)}
+                  >
+                    Add custom mode
+                  </button>
+                ) : (
+                  <div className="settings-add-form settings-card" style={{ marginTop: 12 }}>
+                    <h3>Add custom mode</h3>
+                    <p className="settings-card-desc">
+                      Name your mode and describe what Clarifi should help with. Built-in modes are
+                      managed by Clarifi and cannot be edited.
+                    </p>
+                    <div className="settings-form-grid">
+                      <div className="settings-field">
+                        <label>Mode name</label>
+                        <input
+                          className="settings-input"
+                          value={newMode.label}
+                          onChange={(e) => setNewMode((p) => ({ ...p, label: e.target.value }))}
+                          placeholder="Client onboarding calls"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label>Category (optional)</label>
+                        <input
+                          className="settings-input"
+                          value={newMode.category}
+                          onChange={(e) => setNewMode((p) => ({ ...p, category: e.target.value }))}
+                          placeholder="Custom"
+                        />
+                      </div>
+                      <div className="settings-field" style={{ gridColumn: '1 / -1' }}>
+                        <label>What should Clarifi help with?</label>
+                        <textarea
+                          className="settings-textarea"
+                          value={newMode.description}
+                          onChange={(e) =>
+                            setNewMode((p) => ({ ...p, description: e.target.value }))
+                          }
+                          placeholder="e.g. Help me handle pricing objections and schedule follow-up demos."
+                          rows={4}
+                        />
+                      </div>
                     </div>
-                    <textarea
-                      className="settings-textarea"
-                      value={draftPrompt}
-                      onChange={(e) => setDraftPrompt(e.target.value)}
-                    />
                     <div className="settings-form-actions">
-                      <button type="button" className="settings-btn primary" onClick={() => void savePrompt()}>
-                        Save prompt
+                      <button
+                        type="button"
+                        className="settings-btn primary"
+                        onClick={() => void addMode()}
+                      >
+                        Save mode
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-btn"
+                        onClick={() => {
+                          setShowAddMode(false)
+                          setNewMode({ label: '', category: '', description: '' })
+                        }}
+                      >
+                        Cancel
                       </button>
                     </div>
                   </div>

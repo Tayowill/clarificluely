@@ -300,6 +300,98 @@ body,
   color: #f87171;
 }
 
+.settings-history-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-history-filter {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.settings-history-filter:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.settings-history-filter.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #fff;
+}
+
+.settings-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+}
+
+.settings-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.settings-history-row--archived {
+  opacity: 0.72;
+}
+
+.settings-history-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-history-row-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.settings-history-row-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.settings-history-rename-input {
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.settings-history-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+
 .settings-section-title {
   font-size: 22px;
   font-weight: 600;
@@ -565,10 +657,88 @@ body,
   border-radius: 10px;
 }
 
+.settings-keybind-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .settings-keybind-action {
   font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
+}
+
+.settings-keybind-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.settings-keybind-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.settings-keybind-keys-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.settings-keybind-keys-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.settings-keybind-keys-btn.recording {
+  border-color: rgba(59, 130, 246, 0.55);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.settings-keybind-recording-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #93c5fd;
+  padding: 4px 8px;
+}
+
+.settings-keybind-reset {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+}
+
+.settings-keybind-reset:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.settings-keybind-recording {
+  font-size: 12px;
+  color: #93c5fd;
+  margin: 0 0 12px;
+}
+
+.settings-keybind-recording-hint {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.settings-keybind-error {
+  font-size: 12px;
+  color: #f87171;
+  margin: 0 0 12px;
 }
 
 .settings-keybind-keys {

@@ -66,7 +66,8 @@ const INVOKE_CHANNELS = [
   'prefs:save',
   'prefs:set-active-model',
   'prefs:set-active-mode',
-  'prefs:update-mode-prompt',
+  'prefs:add-mode',
+  'prefs:remove-mode',
   'prefs:add-model',
   'prefs:remove-model',
   'settings:open',
@@ -101,6 +102,7 @@ const EVENT_CHANNELS = [
   'keybind:action',
   'keybinds:prefs-changed',
   'settings:tab',
+  'overlay:protection-changed',
 ] as const
 
 type InvokeChannel = (typeof INVOKE_CHANNELS)[number]
