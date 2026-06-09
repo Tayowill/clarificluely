@@ -94,8 +94,9 @@ export default function PrivacyPolicyPage() {
               .
             </li>
             <li>
-              <strong>Customer content:</strong> audio, transcripts, screenshots, chat messages, and
-              other content you submit through the Services in connection with meetings or AI features.
+              <strong>Customer content:</strong> audio, transcripts (including speaker labels in group
+              calls), screenshots, chat messages, and other content you submit through the Services in
+              connection with meetings or AI features.
             </li>
             <li>
               <strong>Communications:</strong> information you send when you contact support, join a
@@ -137,7 +138,10 @@ export default function PrivacyPolicyPage() {
             <li>Provide, operate, maintain, and improve the Services</li>
             <li>Create and manage your account or waitlist registration</li>
             <li>Process payments and manage subscriptions</li>
-            <li>Deliver real-time AI assistance, transcription, and related features you request</li>
+            <li>
+              Deliver real-time AI assistance, transcription, speaker diarization for group calls, and
+              related features you request
+            </li>
             <li>Respond to support requests and communicate with you about the Services</li>
             <li>Send service announcements, security alerts, and administrative messages</li>
             <li>Detect, prevent, and address fraud, abuse, and security issues</li>

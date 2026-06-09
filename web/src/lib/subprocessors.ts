@@ -33,9 +33,15 @@ export const SUBPROCESSORS: Subprocessor[] = [
   },
   {
     name: 'Groq',
-    purpose: 'Speech-to-text transcription',
+    purpose: 'Speech-to-text transcription (one-on-one and fallback)',
     location: 'United States',
     website: 'https://groq.com',
+  },
+  {
+    name: 'Deepgram',
+    purpose: 'Speech-to-text transcription and speaker diarization for group calls',
+    location: 'United States',
+    website: 'https://deepgram.com',
   },
   {
     name: 'Google',
