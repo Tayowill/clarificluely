@@ -4,15 +4,20 @@
   background: rgba(255, 255, 255, 0.22);
   backdrop-filter: blur(28px) saturate(1.8);
   -webkit-backdrop-filter: blur(28px) saturate(1.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 30px rgba(26, 26, 46, 0.04);
+  border-bottom: 1px solid transparent;
+  box-shadow: none;
 }
 
 .waitlist-page .landing-nav.scrolled {
   background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(32px) saturate(1.8);
   -webkit-backdrop-filter: blur(32px) saturate(1.8);
-  border-bottom-color: rgba(255, 255, 255, 0.5);
+  border-bottom-color: rgba(232, 236, 244, 0.45);
+  box-shadow: 0 4px 24px rgba(26, 26, 46, 0.04);
+}
+
+.waitlist-page .landing-hero {
+  background: transparent;
 }
 
 .waitlist-nav-links {
@@ -22,8 +27,14 @@
 
 .waitlist-benefits {
   position: relative;
-  padding: 5rem 1.5rem;
-  background: linear-gradient(180deg, #fff 0%, var(--cl-lavender-soft) 100%);
+  margin-top: -3rem;
+  padding: 6rem 1.5rem 5rem;
+  background:
+    linear-gradient(180deg, transparent 0%, hsl(250 40% 90% / 0.28) 10%),
+    linear-gradient(var(--cl-frost-veil), var(--cl-frost-veil)),
+    radial-gradient(ellipse 85% 65% at 0% 15%, hsl(250 43% 87% / 0.42) 0%, transparent 58%),
+    radial-gradient(ellipse 72% 60% at 100% 88%, hsl(350 42% 87% / 0.38) 0%, transparent 55%),
+    linear-gradient(180deg, transparent 0%, var(--cl-lavender-soft) 100%);
   overflow: hidden;
 }
 
@@ -40,15 +51,15 @@
 .waitlist-benefits::before {
   width: 420px;
   height: 420px;
-  background: rgba(196, 181, 253, 0.35);
+  background: hsl(250 50% 78% / 0.42);
   top: 10%;
   left: -8%;
 }
 
 .waitlist-benefits::after {
-  width: 360px;
-  height: 360px;
-  background: rgba(251, 207, 232, 0.3);
+  width: 380px;
+  height: 380px;
+  background: hsl(350 45% 84% / 0.38);
   bottom: 5%;
   right: -6%;
 }
@@ -157,7 +168,12 @@
 
 .waitlist-early {
   padding: 5rem 1.5rem;
-  background: #fff;
+  background: linear-gradient(
+    180deg,
+    var(--cl-lavender-soft) 0%,
+    hsl(0, 0%, 99.5%) 28%,
+    hsl(0, 0%, 99.5%) 100%
+  );
 }
 
 .waitlist-early-row {
@@ -195,7 +211,7 @@
 }
 
 .waitlist-site-footer {
-  background: #e8eaf0;
+  background: linear-gradient(180deg, hsl(0, 0%, 99.5%) 0%, #e8eaf0 100%);
 }
 
 .waitlist-site-footer .landing-footer-logo-text {
