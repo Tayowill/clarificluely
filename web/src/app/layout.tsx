@@ -19,9 +19,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
-  title: {
-    default: SITE_TITLE,
-  },
+  title: SITE_TITLE,
   description: SITE_DESCRIPTION,
   keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,

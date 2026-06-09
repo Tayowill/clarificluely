@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
-import { LandingPage } from '@/components/landing/LandingPage'
-import { getMacDownloadUrl } from '@/lib/downloads'
-import { redirectOAuthCodeIfPresent } from '@/lib/prelaunch-page'
+import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
+import { AUTH_NEXT_COOKIE } from '@/lib/auth-next'
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -13,7 +14,6 @@ import {
 } from '@/lib/site-metadata'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { getSiteOrigin } from '@/lib/site-url'
-import { isLaunchLive } from '@/lib/waitlist-config'
 
 export const metadata: Metadata = {
   title: SITE_TITLE,
@@ -39,10 +39,15 @@ type HomeProps = {
 
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams
-  await redirectOAuthCodeIfPresent(params)
-
-  if (isLaunchLive()) {
-    return <LandingPage macDownloadUrl={getMacDownloadUrl()} />
+  if (typeof params.code === 'string') {
+    const q = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string') q.set(key, value)
+    }
+    const cookieStore = await cookies()
+    const authNext = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
+    const target = authCallbackRedirectPath(q, authNext)
+    if (target) redirect(target)
   }
 
   const supabaseConfig = getSupabaseEnv()
