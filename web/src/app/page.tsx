@@ -9,7 +9,6 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_OG_IMAGE,
-  SITE_TAGLINE,
   SITE_TITLE,
 } from '@/lib/site-metadata'
 import { getSupabaseEnv } from '@/lib/supabase/env'
@@ -21,14 +20,14 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
   openGraph: {
     title: SITE_TITLE,
-    description: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
     url: '/',
     siteName: SITE_NAME,
     images: [SITE_OG_IMAGE],
   },
   twitter: {
     title: SITE_TITLE,
-    description: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
     images: [SITE_OG_IMAGE.url],
   },
 }
