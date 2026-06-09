@@ -111,9 +111,14 @@ class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
     }
 
     private func extractPCMData(from sampleBuffer: CMSampleBuffer) -> Data? {
+        guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
+            return nil
+        }
         guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else {
             return nil
         }
+
         var length = 0
         var dataPointer: UnsafeMutablePointer<Int8>?
         CMBlockBufferGetDataPointer(
@@ -123,7 +128,28 @@ class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
             totalLengthOut: &length,
             dataPointerOut: &dataPointer
         )
-        guard let pointer = dataPointer else { return nil }
+        guard let pointer = dataPointer, length > 0 else { return nil }
+
+        let format = asbd.pointee
+        let isFloat = (format.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+        let bytesPerFrame = Int(format.mBytesPerFrame)
+        guard bytesPerFrame > 0 else { return nil }
+        let frameCount = length / bytesPerFrame
+
+        if isFloat && bytesPerFrame == 4 {
+            var int16Data = Data(capacity: frameCount * 2)
+            pointer.withMemoryRebound(to: Float.self, capacity: frameCount) { floatPtr in
+                for i in 0..<frameCount {
+                    let sample = floatPtr[i]
+                    let clamped = max(-1.0, min(1.0, sample))
+                    let int16Sample = Int16(clamped * 32767.0)
+                    var le = int16Sample.littleEndian
+                    int16Data.append(Data(bytes: &le, count: 2))
+                }
+            }
+            return int16Data
+        }
+
         return Data(bytes: pointer, count: length)
     }
 

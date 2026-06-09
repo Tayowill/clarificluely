@@ -58,7 +58,7 @@ export type TranscribeOptions = {
 
 const MIN_WEBM_BYTES = 1_200
 const MIN_WAV_BYTES = 24_000
-const SYSTEM_SPEECH_RMS_MIN = 0.01
+const SYSTEM_SPEECH_RMS_MIN = 0.004
 
 export function wavRms(buffer: Buffer): number {
   if (buffer.length < 48 || buffer.toString('ascii', 0, 4) !== 'RIFF') {

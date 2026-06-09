@@ -43,15 +43,22 @@ const ACTIVITY_SILENCE_MS = 6000
 
 export const MIC_SPEECH_RMS_MIN = 0.008
 export const MIC_USER_SPEECH_RMS = 0.022
-const SYSTEM_SPEECH_RMS_MIN = 0.01
+const SYSTEM_SPEECH_RMS_MIN = 0.004
 
 type SpeechWindow = {
   at: number
   rms: number
 }
 
+type SystemChunkWindow = {
+  at: number
+  rms: number
+  hadEnergy: boolean
+}
+
 let recentSystemSpeech: SpeechWindow[] = []
 let recentMicSpeech: SpeechWindow[] = []
+let recentSystemChunks: SystemChunkWindow[] = []
 
 export function configureTranscriptionQueue(next: TranscriptionQueueOptions): void {
   options = next
@@ -65,6 +72,7 @@ export function clearTranscriptionQueue(): void {
   draining = false
   recentSystemSpeech = []
   recentMicSpeech = []
+  recentSystemChunks = []
   options?.onActivity?.('listening')
 }
 
@@ -84,6 +92,10 @@ export function enqueueTranscription(
     queueMic.push(chunk)
     void drainSystemQueue().then(() => drainMicQueue())
   } else {
+    recentSystemChunks.push({ at: chunk.enqueuedAt, rms: 0, hadEnergy: false })
+    if (recentSystemChunks.length > 24) {
+      recentSystemChunks = recentSystemChunks.slice(-24)
+    }
     queueSystem.push(chunk)
     void drainSystemQueue()
   }
@@ -131,6 +143,49 @@ function systemSpeechOverlapsMic(at: number): boolean {
   return recentSystemSpeech.some(
     (window) => Math.abs(window.at - at) <= MIC_BLEED_WINDOW_MS,
   )
+}
+
+function updateSystemChunkWindow(at: number, rms: number, hadEnergy: boolean): void {
+  const idx = recentSystemChunks.findIndex((chunk) => Math.abs(chunk.at - at) < 2000)
+  const next: SystemChunkWindow = { at, rms, hadEnergy }
+  if (idx >= 0) {
+    recentSystemChunks[idx] = next
+  } else {
+    recentSystemChunks.push(next)
+    if (recentSystemChunks.length > 24) {
+      recentSystemChunks = recentSystemChunks.slice(-24)
+    }
+  }
+}
+
+function resolveMicEntryTarget(chunk: QueuedChunk): {
+  speaker: string
+  source: TranscriptSource
+} {
+  if (!isDualCallMode()) {
+    return { speaker: 'Me', source: 'mic' }
+  }
+
+  const micRms = chunk.rms ?? 0
+  const overlapping = recentSystemChunks.filter(
+    (sys) =>
+      Math.abs(chunk.enqueuedAt - sys.at) <= MIC_BLEED_WINDOW_MS &&
+      (sys.hadEnergy || sys.rms >= SYSTEM_SPEECH_RMS_MIN),
+  )
+
+  if (overlapping.length === 0) {
+    return { speaker: 'Me', source: 'mic' }
+  }
+
+  const maxSystemRms = Math.max(...overlapping.map((sys) => sys.rms), SYSTEM_SPEECH_RMS_MIN)
+  const userSpeaking =
+    micRms >= MIC_USER_SPEECH_RMS && micRms >= maxSystemRms * 2.2
+
+  if (userSpeaking) {
+    return { speaker: 'Me', source: 'mic' }
+  }
+
+  return { speaker: 'Them', source: 'system' }
 }
 
 function hasRecentSpeech(): boolean {
@@ -271,10 +326,6 @@ function shouldProcessMicChunk(chunk: QueuedChunk): boolean {
 
   if (rms < MIC_SPEECH_RMS_MIN) return false
 
-  if (isDualCallMode() && systemSpeechOverlapsMic(chunk.enqueuedAt)) {
-    if (rms < MIC_USER_SPEECH_RMS) return false
-  }
-
   return true
 }
 
@@ -301,12 +352,16 @@ async function processMicChunk(chunk: QueuedChunk): Promise<void> {
     updateActivityState()
     return
   }
-  if (shouldSkipMicBleed(transcript, chunk, entries)) {
+  const target = resolveMicEntryTarget(chunk)
+  if (
+    target.source === 'mic' &&
+    shouldSkipMicBleed(transcript, chunk, entries)
+  ) {
     updateActivityState()
     return
   }
 
-  emitEntry(chunk, transcript, 'Me', 'mic')
+  emitEntry(chunk, transcript, target.speaker, target.source)
   updateActivityState()
 }
 
@@ -315,8 +370,10 @@ async function processSystemChunk(chunk: QueuedChunk): Promise<void> {
 
   const audioBuffer = Buffer.from(chunk.base64, 'base64')
   const rms = wavRms(audioBuffer)
+  const hadEnergy = wavHasSpeechEnergy(audioBuffer)
+  updateSystemChunkWindow(chunk.enqueuedAt, rms, hadEnergy)
 
-  if (!wavHasSpeechEnergy(audioBuffer)) {
+  if (!hadEnergy) {
     updateActivityState()
     return
   }
