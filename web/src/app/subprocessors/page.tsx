@@ -12,7 +12,7 @@ export const metadata = {
 export default function SubprocessorsPage() {
   return (
     <div className="legal-root">
-      <MarketingNav />
+      <MarketingNav showBack />
 
       <div className="legal-layout legal-layout-single">
         <main className="legal-main">
