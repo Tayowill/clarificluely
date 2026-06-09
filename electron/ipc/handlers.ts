@@ -348,8 +348,21 @@ function getSessionTranscriptEntries(): TranscriptEntry[] {
   return [...sessionTranscriptEntries]
 }
 
-function enqueueAudioChunk(base64: string, source: TranscriptSource): void {
-  enqueueTranscription(base64, source)
+function broadcastTranscriptionActivity(
+  state: 'silent' | 'listening' | 'transcribing',
+): void {
+  const overlay = getOverlayWindow()
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.webContents.send('transcription:activity', { state })
+  }
+}
+
+function enqueueAudioChunk(
+  base64: string,
+  source: TranscriptSource,
+  rms?: number,
+): void {
+  enqueueTranscription(base64, source, rms)
 }
 
 let handlersRegistered = false
@@ -706,6 +719,7 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
       getEntries: getSessionTranscriptEntries,
       onEntry: pushTranscriptEntry,
       onPruneEntries: pruneTranscriptEntries,
+      onActivity: broadcastTranscriptionActivity,
     })
 
     const overlay = getOverlayWindow()
@@ -756,15 +770,22 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { isRecording: getIsRecording(), isPaused: getIsPaused() }
   })
 
-  ipcMain.handle('audio:chunk', (_event, payload: string | { base64?: string; source?: string }) => {
-    const base64 = typeof payload === 'string' ? payload : payload?.base64
-    const source: TranscriptSource =
-      typeof payload === 'object' && payload?.source === 'system' ? 'system' : 'mic'
-    if (typeof base64 === 'string' && base64.length > 0) {
-      enqueueAudioChunk(base64, source)
-    }
-    return { status: 'queued' }
-  })
+  ipcMain.handle(
+    'audio:chunk',
+    (_event, payload: string | { base64?: string; source?: string; rms?: number }) => {
+      const base64 = typeof payload === 'string' ? payload : payload?.base64
+      const source: TranscriptSource =
+        typeof payload === 'object' && payload?.source === 'system' ? 'system' : 'mic'
+      const rms =
+        typeof payload === 'object' && typeof payload.rms === 'number'
+          ? payload.rms
+          : undefined
+      if (typeof base64 === 'string' && base64.length > 0) {
+        enqueueAudioChunk(base64, source, rms)
+      }
+      return { status: 'queued' }
+    },
+  )
 
   registerValidatedHandler(
     'screen:capture',

@@ -90,6 +90,7 @@ type TranscriptEntry = {
 }
 
 const MIC_SEGMENT_MS = 5000
+const MIC_SPEECH_RMS_MIN = 0.008
 
 function formatTranscriptTime(at: number): string {
   const date = new Date(at)
@@ -554,11 +555,18 @@ export default function Overlay() {
   const [audioSessionChatStatus, setAudioSessionChatStatus] = useState('')
   const [liveSpeakerLabels, setLiveSpeakerLabels] = useState<SpeakerLabels>({})
   const [transcriptionMode, setTranscriptionMode] = useState<'dual' | 'group'>('dual')
+  const [transcriptionActivity, setTranscriptionActivity] = useState<
+    'silent' | 'listening' | 'transcribing'
+  >('listening')
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const isCapturingRef = useRef(false)
   const mimeTypeRef = useRef('audio/webm')
   const micSegmentTimerRef = useRef<number | null>(null)
+  const micAudioContextRef = useRef<AudioContext | null>(null)
+  const micAnalyserRef = useRef<AnalyserNode | null>(null)
+  const micSpeechCheckRef = useRef<number | null>(null)
+  const micSegmentMaxRmsRef = useRef(0)
   const liveTranscriptRef = useRef<HTMLDivElement | null>(null)
   const chatBodyRef = useRef<HTMLDivElement | null>(null)
   const modelMenuRef = useRef<HTMLDivElement | null>(null)
@@ -652,6 +660,12 @@ export default function Overlay() {
       const data = payload as { sessions?: StoredAudioSession[] }
       if (Array.isArray(data?.sessions)) {
         setAudioSessions(data.sessions)
+      }
+    })
+    window.electronAPI.on('transcription:activity', (payload) => {
+      const state = (payload as { state?: string })?.state
+      if (state === 'silent' || state === 'listening' || state === 'transcribing') {
+        setTranscriptionActivity(state)
       }
     })
   }, [])
@@ -870,6 +884,43 @@ export default function Overlay() {
     }
   }
 
+  const getMicRms = useCallback(() => {
+    const analyser = micAnalyserRef.current
+    if (!analyser) return 0
+    const buf = new Float32Array(analyser.fftSize)
+    analyser.getFloatTimeDomainData(buf)
+    let sum = 0
+    for (let i = 0; i < buf.length; i += 1) {
+      sum += buf[i] * buf[i]
+    }
+    return Math.sqrt(sum / buf.length)
+  }, [])
+
+  const teardownMicAnalyser = useCallback(() => {
+    if (micSpeechCheckRef.current) {
+      window.clearInterval(micSpeechCheckRef.current)
+      micSpeechCheckRef.current = null
+    }
+    void micAudioContextRef.current?.close()
+    micAudioContextRef.current = null
+    micAnalyserRef.current = null
+    micSegmentMaxRmsRef.current = 0
+  }, [])
+
+  const setupMicAnalyser = useCallback(
+    (stream: MediaStream) => {
+      teardownMicAnalyser()
+      const ctx = new AudioContext()
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 2048
+      source.connect(analyser)
+      micAudioContextRef.current = ctx
+      micAnalyserRef.current = analyser
+    },
+    [teardownMicAnalyser],
+  )
+
   const stopMicCapture = () => {
     isCapturingRef.current = false
     if (micSegmentTimerRef.current) {
@@ -884,6 +935,7 @@ export default function Overlay() {
       }
     }
     mediaRecorderRef.current = null
+    teardownMicAnalyser()
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -923,12 +975,35 @@ export default function Overlay() {
 
     const mediaRecorder = new MediaRecorder(stream, { mimeType })
     mediaRecorderRef.current = mediaRecorder
+    micSegmentMaxRmsRef.current = 0
+
+    if (micSpeechCheckRef.current) {
+      window.clearInterval(micSpeechCheckRef.current)
+    }
+    micSpeechCheckRef.current = window.setInterval(() => {
+      const rms = getMicRms()
+      if (rms > micSegmentMaxRmsRef.current) {
+        micSegmentMaxRmsRef.current = rms
+      }
+    }, 150)
 
     mediaRecorder.ondataavailable = async (event) => {
       if (!isCapturingRef.current || event.data.size < 500) return
+      if (micSpeechCheckRef.current) {
+        window.clearInterval(micSpeechCheckRef.current)
+        micSpeechCheckRef.current = null
+      }
+      const segmentRms = Math.max(micSegmentMaxRmsRef.current, getMicRms())
+      micSegmentMaxRmsRef.current = 0
+      if (segmentRms < MIC_SPEECH_RMS_MIN) return
+
       const arrayBuffer = await event.data.arrayBuffer()
       const base64 = arrayBufferToBase64(arrayBuffer)
-      void window.electronAPI.invoke('audio:chunk', { base64, source: 'mic' })
+      void window.electronAPI.invoke('audio:chunk', {
+        base64,
+        source: 'mic',
+        rms: segmentRms,
+      })
     }
 
     mediaRecorder.onstop = () => {
@@ -975,7 +1050,9 @@ export default function Overlay() {
 
       streamRef.current = stream
       mimeTypeRef.current = mimeType
+      setupMicAnalyser(stream)
       await window.electronAPI.invoke('audio:start')
+      setTranscriptionActivity('listening')
       setTranscript([])
       setFullTranscript([])
       setSuggestions([])
@@ -1543,18 +1620,22 @@ export default function Overlay() {
     : fullTranscript
 
   const renderLiveTranscriptFeed = (entries: TranscriptEntry[]) => {
-    const lastEntry = entries[entries.length - 1]
     const showTalking =
-      isLiveSession &&
-      !isPaused &&
-      lastEntry &&
-      sessionClock - lastEntry.at < 6000
+      isLiveSession && !isPaused && transcriptionActivity === 'transcribing'
+    const showSilent =
+      isLiveSession && !isPaused && transcriptionActivity === 'silent'
 
     if (entries.length === 0) {
       return (
         <div className="overlay-empty transcript-feed-empty">
-          Listening… <strong>Me</strong> is your microphone. <strong>Them</strong> is everyone else
-          on the call.
+          {showSilent ? (
+            <>Paused — no speech detected. Transcription resumes when someone speaks.</>
+          ) : (
+            <>
+              Listening… <strong>Me</strong> is your microphone. <strong>Them</strong> is everyone
+              else on the call.
+            </>
+          )}
         </div>
       )
     }
@@ -1573,14 +1654,21 @@ export default function Overlay() {
           </div>
         ))}
         {showTalking && (
-          <div className={`transcript-feed-row transcript-feed-live source-${lastEntry.source}`}>
+          <div className="transcript-feed-row transcript-feed-live">
             <span className="transcript-feed-time">Now</span>
             <div className="transcript-feed-body">
-              <span className="transcript-feed-speaker">{feedSpeakerLabel(lastEntry)}</span>
               <span className="transcript-feed-status">
                 <span className="transcript-feed-pulse" aria-hidden />
-                Currently talking…
+                Transcribing…
               </span>
+            </div>
+          </div>
+        )}
+        {showSilent && (
+          <div className="transcript-feed-row transcript-feed-paused">
+            <span className="transcript-feed-time">—</span>
+            <div className="transcript-feed-body">
+              <span className="transcript-feed-status">Paused — no speech detected</span>
             </div>
           </div>
         )}

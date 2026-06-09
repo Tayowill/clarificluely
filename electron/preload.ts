@@ -88,6 +88,7 @@ const INVOKE_CHANNELS = [
 const EVENT_CHANNELS = [
   'suggestions:update',
   'transcript:update',
+  'transcription:activity',
   'onboarding:tutorial-event',
   'onboarding:auth-connected',
   'onboarding:mock-nudge',

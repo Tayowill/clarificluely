@@ -14,15 +14,19 @@ import {
   type TranscriptSource,
 } from './transcriptUtils'
 
+export type TranscriptionActivityState = 'silent' | 'listening' | 'transcribing'
+
 type QueuedChunk = {
   base64: string
   source: TranscriptSource
   enqueuedAt: number
+  rms?: number
 }
 
 type TranscriptionQueueOptions = {
   onEntry: (entry: TranscriptEntry) => void
   onPruneEntries?: (entryIds: string[]) => void
+  onActivity?: (state: TranscriptionActivityState) => void
   getEntries: () => TranscriptEntry[]
 }
 
@@ -35,14 +39,19 @@ let options: TranscriptionQueueOptions | null = null
 
 const SYSTEM_FIRST_WAIT_MS = 12_000
 const MIC_BLEED_WINDOW_MS = 25_000
+const ACTIVITY_SILENCE_MS = 6000
+
+export const MIC_SPEECH_RMS_MIN = 0.008
+export const MIC_USER_SPEECH_RMS = 0.022
 const SYSTEM_SPEECH_RMS_MIN = 0.01
 
-type SystemSpeechWindow = {
+type SpeechWindow = {
   at: number
   rms: number
 }
 
-let recentSystemSpeech: SystemSpeechWindow[] = []
+let recentSystemSpeech: SpeechWindow[] = []
+let recentMicSpeech: SpeechWindow[] = []
 
 export function configureTranscriptionQueue(next: TranscriptionQueueOptions): void {
   options = next
@@ -55,16 +64,22 @@ export function clearTranscriptionQueue(): void {
   processingSystem = false
   draining = false
   recentSystemSpeech = []
+  recentMicSpeech = []
+  options?.onActivity?.('listening')
 }
 
 export function isTranscriptionDrainMode(): boolean {
   return draining
 }
 
-export function enqueueTranscription(base64: string, source: TranscriptSource): void {
+export function enqueueTranscription(
+  base64: string,
+  source: TranscriptSource,
+  rms?: number,
+): void {
   if (!base64 || !options || getIsPaused()) return
   if (source === 'mic' && isGroupCallMode()) return
-  const chunk: QueuedChunk = { base64, source, enqueuedAt: Date.now() }
+  const chunk: QueuedChunk = { base64, source, enqueuedAt: Date.now(), rms }
   if (source === 'mic') {
     queueMic.push(chunk)
     void drainSystemQueue().then(() => drainMicQueue())
@@ -104,10 +119,36 @@ function recordSystemSpeech(at: number, rms: number): void {
   }
 }
 
+function recordMicSpeech(at: number, rms: number): void {
+  if (rms < MIC_SPEECH_RMS_MIN) return
+  recentMicSpeech.push({ at, rms })
+  if (recentMicSpeech.length > 24) {
+    recentMicSpeech = recentMicSpeech.slice(-24)
+  }
+}
+
 function systemSpeechOverlapsMic(at: number): boolean {
   return recentSystemSpeech.some(
     (window) => Math.abs(window.at - at) <= MIC_BLEED_WINDOW_MS,
   )
+}
+
+function hasRecentSpeech(): boolean {
+  const now = Date.now()
+  const system = recentSystemSpeech.some((w) => now - w.at <= ACTIVITY_SILENCE_MS)
+  const mic = recentMicSpeech.some(
+    (w) => now - w.at <= ACTIVITY_SILENCE_MS && w.rms >= MIC_SPEECH_RMS_MIN,
+  )
+  return system || mic
+}
+
+function updateActivityState(): void {
+  if (!options?.onActivity) return
+  if (processingMic || processingSystem) {
+    options.onActivity('transcribing')
+    return
+  }
+  options.onActivity(hasRecentSpeech() ? 'listening' : 'silent')
 }
 
 function shouldSkipMicBleed(
@@ -148,12 +189,14 @@ function pruneMicBleedFromSession(systemEntry: TranscriptEntry): void {
 async function drainMicQueue(): Promise<void> {
   if (processingMic || !options) return
   processingMic = true
+  updateActivityState()
   try {
     while (queueMic.length > 0 && options) {
       await processMicChunk(queueMic.shift()!)
     }
   } finally {
     processingMic = false
+    updateActivityState()
     if (queueMic.length > 0) {
       void drainMicQueue()
     }
@@ -163,12 +206,14 @@ async function drainMicQueue(): Promise<void> {
 async function drainSystemQueue(): Promise<void> {
   if (processingSystem || !options) return
   processingSystem = true
+  updateActivityState()
   try {
     while (queueSystem.length > 0 && options) {
       await processSystemChunk(queueSystem.shift()!)
     }
   } finally {
     processingSystem = false
+    updateActivityState()
     if (queueSystem.length > 0) {
       void drainSystemQueue()
     }
@@ -220,8 +265,26 @@ function emitEntry(
   options.onEntry(entry)
 }
 
+function shouldProcessMicChunk(chunk: QueuedChunk): boolean {
+  const rms = chunk.rms ?? 0
+  recordMicSpeech(chunk.enqueuedAt, rms)
+
+  if (rms < MIC_SPEECH_RMS_MIN) return false
+
+  if (isDualCallMode() && systemSpeechOverlapsMic(chunk.enqueuedAt)) {
+    if (rms < MIC_USER_SPEECH_RMS) return false
+  }
+
+  return true
+}
+
 async function processMicChunk(chunk: QueuedChunk): Promise<void> {
   if (!options || isGroupCallMode()) return
+
+  if (!shouldProcessMicChunk(chunk)) {
+    updateActivityState()
+    return
+  }
 
   if (isDualCallMode()) {
     await waitForSystemDrain()
@@ -234,10 +297,17 @@ async function processMicChunk(chunk: QueuedChunk): Promise<void> {
     prompt,
   })
 
-  if (!transcript) return
-  if (shouldSkipMicBleed(transcript, chunk, entries)) return
+  if (!transcript) {
+    updateActivityState()
+    return
+  }
+  if (shouldSkipMicBleed(transcript, chunk, entries)) {
+    updateActivityState()
+    return
+  }
 
   emitEntry(chunk, transcript, 'Me', 'mic')
+  updateActivityState()
 }
 
 async function processSystemChunk(chunk: QueuedChunk): Promise<void> {
@@ -246,21 +316,23 @@ async function processSystemChunk(chunk: QueuedChunk): Promise<void> {
   const audioBuffer = Buffer.from(chunk.base64, 'base64')
   const rms = wavRms(audioBuffer)
 
-  if (isGroupCallMode()) {
-    if (!wavHasSpeechEnergy(audioBuffer)) return
-    recordSystemSpeech(chunk.enqueuedAt, rms)
+  if (!wavHasSpeechEnergy(audioBuffer)) {
+    updateActivityState()
+    return
+  }
 
+  recordSystemSpeech(chunk.enqueuedAt, rms)
+
+  if (isGroupCallMode()) {
     const utterances = await transcribeSystemWithDiarization(chunk.base64)
     if (utterances && utterances.length > 0) {
       for (const utterance of utterances) {
         emitEntry(chunk, utterance.text, utterance.speaker, 'system')
       }
     }
+    updateActivityState()
     return
   }
-
-  if (!wavHasSpeechEnergy(audioBuffer)) return
-  recordSystemSpeech(chunk.enqueuedAt, rms)
 
   const entries = options.getEntries()
   const prompt = buildTranscriptionPrompt(entries, 'system')
@@ -269,7 +341,11 @@ async function processSystemChunk(chunk: QueuedChunk): Promise<void> {
     prompt,
   })
 
-  if (!transcript) return
+  if (!transcript) {
+    updateActivityState()
+    return
+  }
 
   emitEntry(chunk, transcript, 'Them', 'system')
+  updateActivityState()
 }
