@@ -257,7 +257,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content waitlist-hero-content">
           <h1 className="waitlist-hero-title">
-            The Undetectable AI Co-Pilot for Every Conversation.
+            The Undetectable AI Co-Pilot for{' '}
+            <span className="waitlist-hero-title-accent">Every Virtual Meeting</span>.
           </h1>
           <p>
             Clarifi hears what you hear. Sees what you see and provides real-time answers,
