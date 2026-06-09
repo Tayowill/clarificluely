@@ -1,69 +1,99 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { BlogNav } from '@/components/blog/BlogNav'
+import { BlogPostContent } from '@/components/blog/BlogPostContent'
+import { BLOG_POST_SLUGS, getBlogPost } from '@/lib/blog-posts'
 import '../../landing-blog.css'
-
-const POSTS: Record<string, { title: string; date: string; readTime: string; body: string[] }> = {
-  'undetectable-ai-meetings': {
-    title: 'Why undetectable AI changes how you run meetings',
-    date: 'May 28, 2026',
-    readTime: '6 min read',
-    body: [
-      'Most meeting AI tools join as a visible participant or produce notes only after you hang up. Clarifi is different: it runs as a lightweight overlay on your Mac, listening and assisting in real time without ever appearing on the guest list.',
-      'That means no awkward "Clarifi bot has joined" moments. No extra tile in Zoom. Your clients and colleagues see only you — while you get live suggestions, answers, and transcription.',
-      'Screen share invisibility is equally important. When you share your screen, Clarifi stays hidden from the recording. Only you see the overlay.',
-    ],
-  },
-  'real-time-vs-after': {
-    title: 'Real-time AI vs. after-the-call notetakers',
-    date: 'May 15, 2026',
-    readTime: '4 min read',
-    body: [
-      'After-the-call summaries are great for documentation. But the highest-stakes moment in any meeting is when someone asks a question you did not expect — and you have three seconds to respond.',
-      'Real-time AI closes that gap. Clarifi surfaces talking points, follow-up questions, and factual answers while the conversation is still happening.',
-      'The result: you sound prepared even when you are not. And you still get beautiful notes when the call ends.',
-    ],
-  },
-  'clarifi-launch': {
-    title: 'Introducing Clarifi for Mac',
-    date: 'Jun 1, 2026',
-    readTime: '3 min read',
-    body: [
-      'Today we are launching Clarifi for Mac — an invisible AI co-pilot for every meeting.',
-      'Download from our website, sign in, and connect your desktop app in one click. No API keys, no pairing codes, no bots.',
-      'We are starting with macOS and building mobile next. Try it free on your next call.',
-    ],
-  },
-}
 
 type PageProps = { params: Promise<{ slug: string }> }
 
+export function generateStaticParams() {
+  return BLOG_POST_SLUGS.map((slug) => ({ slug }))
+}
+
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
-  const post = POSTS[slug]
+  const post = getBlogPost(slug)
   if (!post) return { title: 'Blog — Clarifi' }
   return {
-    title: `${post.title} — Clarifi Blog`,
+    title: `${post.metaTitle} — Clarifi Blog`,
+    description: post.metaDescription,
     alternates: { canonical: `/blog/${slug}` },
+    openGraph: {
+      title: post.metaTitle,
+      description: post.metaDescription,
+      type: 'article',
+      url: `/blog/${slug}`,
+      images: [{ url: post.image, alt: post.imageAlt }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.metaTitle,
+      description: post.metaDescription,
+      images: [post.image],
+    },
   }
+}
+
+function FaqJsonLd({ slug }: { slug: string }) {
+  const post = getBlogPost(slug)
+  if (!post) return null
+
+  const faqStart = post.blocks.findIndex((b) => b.type === 'h2' && b.id === 'faq')
+  if (faqStart < 0) return null
+
+  const faqItems: { question: string; answer: string }[] = []
+  for (let i = faqStart + 1; i < post.blocks.length; i += 1) {
+    const block = post.blocks[i]
+    if (block.type === 'h2') break
+    if (block.type !== 'h3') continue
+    const next = post.blocks[i + 1]
+    if (next?.type === 'p') {
+      faqItems.push({ question: block.text, answer: next.text })
+    }
+  }
+
+  if (faqItems.length === 0) return null
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params
-  const post = POSTS[slug]
+  const post = getBlogPost(slug)
   if (!post) notFound()
 
   return (
     <div className="blog-root">
+      <FaqJsonLd slug={slug} />
       <BlogNav />
       <article className="blog-post">
         <h1>{post.title}</h1>
         <p className="blog-post-meta">
           {post.date} · {post.readTime}
         </p>
-        {post.body.map((para) => (
-          <p key={para.slice(0, 24)}>{para}</p>
-        ))}
+        <BlogPostContent blocks={post.blocks} image={post.image} imageAlt={post.imageAlt} />
+        <p className="blog-post-back">
+          <Link href="/blog">← All posts</Link>
+        </p>
       </article>
     </div>
   )

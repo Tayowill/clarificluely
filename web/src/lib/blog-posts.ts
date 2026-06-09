@@ -1,5 +1,261 @@
-export const BLOG_POST_SLUGS = [
-  'undetectable-ai-meetings',
-  'real-time-vs-after',
-  'clarifi-launch',
-] as const
+export type BlogBlock =
+  | { type: 'p'; text: string; strong?: boolean }
+  | { type: 'h2'; id?: string; text: string }
+  | { type: 'h3'; text: string }
+  | { type: 'ul'; items: string[] }
+  | { type: 'ol'; items: string[] }
+  | { type: 'table'; headers: string[]; rows: string[][] }
+  | { type: 'cta'; text: string; href: string; label: string }
+  | { type: 'hr' }
+
+export type BlogPost = {
+  slug: string
+  title: string
+  excerpt: string
+  date: string
+  readTime: string
+  image: string
+  imageAlt: string
+  metaDescription: string
+  metaTitle: string
+  blocks: BlogBlock[]
+}
+
+export const BLOG_POSTS: BlogPost[] = [
+  {
+    slug: 'is-using-ai-in-meetings-cheating',
+    title: "Is Using AI in Meetings Cheating? Here's the Honest Answer for Sales Reps",
+    excerpt:
+      'Sales reps use AI copilots for real-time answers on live calls. Is that cheating — or just smart selling? The honest ethics breakdown.',
+    date: 'June 9, 2026',
+    readTime: '9 min read',
+    image: '/blog/is-using-ai-in-meetings-cheating.png',
+    imageAlt:
+      'Illustration of a sales rep presenting to a team with flowing ideas — representing real-time AI support during meetings',
+    metaTitle: 'Is Using AI in Meetings Cheating? Honest Answer for Sales',
+    metaDescription:
+      'Is using AI in meetings cheating? Sales reps use AI copilots for real-time answers on live calls. Here\'s the honest ethics breakdown — and what top closers do instead.',
+    blocks: [
+      {
+        type: 'p',
+        text: 'Is using AI in meetings cheating? For most sales reps, no — not when the goal is to give accurate answers faster, not to misrepresent who you are or what your product does.',
+      },
+      {
+        type: 'p',
+        text: "If you've ever frozen mid-demo while a prospect asked about pricing, a competitor, or a technical edge case, you already know the cost of that pause: momentum dies, trust wobbles, and \"let me follow up\" becomes another stalled deal.",
+      },
+      {
+        type: 'p',
+        text: 'More reps are fixing that with an AI meeting assistant — software that listens live and surfaces real-time AI answers during the call. The ethics question followed immediately: is this an unfair advantage, or just smart selling?',
+      },
+      {
+        type: 'p',
+        text: 'This post answers that honestly — without the hype — and explains when AI on sales calls crosses the line.',
+      },
+      { type: 'hr' },
+      { type: 'h2', id: 'the-case', text: 'The case that it\'s "cheating"' },
+      {
+        type: 'p',
+        text: 'The argument usually sounds like this: If you need AI to answer a question, you don\'t really know your product. You\'re deceiving the prospect. You\'re cutting corners.',
+      },
+      {
+        type: 'p',
+        text: 'On the surface, that feels fair. Sales has always rewarded reps who know their stuff — who can handle objections without flinching and speak confidently about value.',
+      },
+      {
+        type: 'p',
+        text: "But that argument assumes something worth examining: that every answer on a live call must come from memory alone, with no tools, no teammates, and no preparation support in the moment. We don't apply that standard anywhere else in sales.",
+      },
+      { type: 'h2', id: 'cheating-vs-smart', text: 'What counts as cheating vs. smart selling' },
+      {
+        type: 'p',
+        text: 'Before labeling an AI sales tool as cheating, compare it to what reps already do without guilt:',
+      },
+      {
+        type: 'table',
+        headers: ['What reps do today', 'Is it "cheating"?', "Why it's accepted"],
+        rows: [
+          ['Review CRM notes before a call', 'No', 'Preparation'],
+          ['Open a battlecard during a competitor question', 'No', 'Enablement'],
+          ['Bring a sales engineer on the call', 'No', 'Expertise on demand'],
+          ['Search internal docs while a prospect waits', 'No', 'Accuracy over ego'],
+          [
+            'Use an AI copilot for sales calls for real-time answers',
+            'Usually no',
+            'Same goal: serve the buyer better',
+          ],
+        ],
+      },
+      {
+        type: 'p',
+        text: "The job of a sales rep is not to win a trivia contest. It's to understand the prospect's problem, communicate value clearly, and help them make a confident decision.",
+      },
+      {
+        type: 'p',
+        text: 'If an AI meeting assistant helps you do that more accurately — without inventing features or lying about pricing — the prospect often gets a better experience, not a worse one.',
+      },
+      { type: 'h3', text: 'Where it does become a problem' },
+      {
+        type: 'ul',
+        items: [
+          'Misrepresenting product capabilities you know aren\'t true',
+          'Fabricating case studies, metrics, or security certifications',
+          "Pretending to be a technical expert when you're fundamentally not — and dodging honest scope conversations",
+          'Using AI to deceive, not to inform',
+        ],
+      },
+      {
+        type: 'p',
+        text: "That's not an AI problem. That's an integrity problem — and it existed long before real-time copilots.",
+        strong: true,
+      },
+      {
+        type: 'p',
+        text: 'Short answer: Using AI in meetings is not cheating when you use it to answer accurately and help the buyer. It is unethical when you use it to mislead.',
+        strong: true,
+      },
+      { type: 'h2', id: 'what-ai-does', text: 'What an AI copilot for sales calls actually does' },
+      {
+        type: 'p',
+        text: 'Not all meeting AI works the same way — and that matters for the ethics conversation.',
+      },
+      {
+        type: 'p',
+        text: 'After-the-call tools transcribe, summarize, and send follow-ups after you hang up. Useful for documentation. Useless when a prospect asks a hard question in second 37 of the demo.',
+      },
+      {
+        type: 'p',
+        text: 'Real-time AI meeting assistants work differently. They:',
+      },
+      {
+        type: 'ol',
+        items: [
+          'Listen live to the conversation (and sometimes screen context)',
+          'Detect moments that matter — objections, pricing pushes, competitor mentions, technical probes',
+          'Surface real-time AI answers — talking points, rebuttals, clarifying questions — while you\'re still on the call',
+          'Run invisibly — without joining as a bot participant or appearing on screen share',
+        ],
+      },
+      {
+        type: 'p',
+        text: 'Tools like Clarifi are built for that second category: an overlay on your Mac that acts like a senior colleague whispering the right line — not a replacement for your judgment.',
+      },
+      {
+        type: 'p',
+        text: "This isn't about outsourcing your expertise. It's about removing the performance gap between what you understand about the deal and what you can articulate under pressure, in real time.",
+      },
+      { type: 'h2', id: 'transparency', text: 'The transparency question reps should ask' },
+      {
+        type: 'p',
+        text: 'The real ethical line isn\'t "did you use AI?" It\'s "did you mislead the buyer?"',
+      },
+      {
+        type: 'p',
+        text: 'Ask yourself before every call:',
+      },
+      {
+        type: 'ol',
+        items: [
+          'Would I stand behind this answer if the prospect asked me to explain it again without help?',
+          'Am I using AI to be more accurate — or to bluff past gaps I should honestly address?',
+          'If the prospect knew I had live support, would they feel deceived — or would they just appreciate the fast, correct response?',
+        ],
+      },
+      {
+        type: 'p',
+        text: "In most B2B sales conversations, buyers care about outcomes: clarity, speed, trust, and whether you can actually solve their problem. They don't care whether you remembered a pricing tier from memory or surfaced it in two seconds with assistance.",
+      },
+      {
+        type: 'p',
+        text: 'Good rule of thumb: Use AI to reduce errors and hesitation. Don\'t use it to inflate capabilities.',
+        strong: true,
+      },
+      { type: 'h2', id: 'top-reps', text: 'Why top reps are adopting real-time AI now' },
+      {
+        type: 'p',
+        text: 'The reps still debating whether an AI meeting assistant is "fair" are often the same ones who will wonder, six months from now, why peers close faster with fewer follow-up loops.',
+      },
+      {
+        type: 'p',
+        text: "Early CRM adopters didn't win because spreadsheets were immoral. They won because they had better information at the right moment. Real-time AI is the same shift — but for live conversations, not post-call admin.",
+      },
+      {
+        type: 'p',
+        text: "Here's what changes when you have an AI copilot for sales calls on every meeting:",
+      },
+      {
+        type: 'ul',
+        items: [
+          'Objection handling gets faster — the rebuttal is there before the awkward pause.',
+          'Technical questions stop freezing deals — respond with substance instead of defaulting to "I\'ll loop in engineering."',
+          'Discovery improves — when you\'re not scrambling, you actually listen.',
+          'Follow-up gets tighter — context is captured live, not reconstructed from memory.',
+          'Confidence compounds — knowing you can handle curveballs changes how you show up on every call.',
+        ],
+      },
+      {
+        type: 'p',
+        text: 'The gap between reps who use real-time AI answers and reps who don\'t will widen the same way the CRM gap did. Not because AI is magic — because speed and accuracy win deals.',
+      },
+      { type: 'h2', id: 'faq', text: 'FAQ' },
+      { type: 'h3', text: 'Is using AI in meetings cheating?' },
+      {
+        type: 'p',
+        text: 'For most sales reps, no. Using an AI meeting assistant to get real-time answers during a call is closer to using a battlecard or CRM notes than to deceiving a prospect. It becomes unethical when you use AI to misrepresent your product, invent capabilities, or mislead buyers about qualifications or outcomes.',
+      },
+      { type: 'h3', text: "Do prospects know when you're using AI on a call?" },
+      {
+        type: 'p',
+        text: "It depends on the tool. Some AI notetakers join as visible meeting participants. Others — like desktop copilots — run as a private overlay only you see. Either way, the ethical standard isn't visibility; it's whether you're giving honest, accurate information.",
+      },
+      { type: 'h3', text: 'Is an AI meeting assistant the same as a notetaker?' },
+      {
+        type: 'p',
+        text: 'No. Notetakers focus on transcription and summaries after the call. A real-time AI copilot for sales calls is built for the moment a prospect asks an unexpected question — when you need an answer in seconds, not a recap in an hour.',
+      },
+      { type: 'h3', text: 'Can AI help with sales objections in real time?' },
+      {
+        type: 'p',
+        text: "Yes — that's one of the highest-value use cases. A good AI sales tool can surface objection-handling frameworks, competitor positioning, and clarifying questions while the conversation is still live.",
+      },
+      { type: 'h3', text: 'When should a sales rep not use AI in a meeting?' },
+      {
+        type: 'p',
+        text: 'Skip it (or use it carefully) when the conversation requires deep bespoke scoping, sensitive HR/legal discussions, or situations where you personally need to own every word. And never use AI to fabricate answers you can\'t defend.',
+      },
+      { type: 'h2', id: 'bottom-line', text: 'Bottom line' },
+      {
+        type: 'p',
+        text: 'Is using AI in meetings cheating? No — not if your standard is what sales has always rewarded: know the customer, tell the truth, and move the deal forward with clarity.',
+      },
+      {
+        type: 'p',
+        text: 'An AI meeting assistant is the modern version of being well-prepared — except instead of memorizing every possible scenario the night before, you get real-time AI answers that adapt to wherever the conversation actually goes.',
+      },
+      {
+        type: 'p',
+        text: 'The reps asking "is this cheating?" will be the ones asking "how is everyone else closing faster?" next year. The reps who use an AI copilot for sales calls responsibly — to be accurate, not to bluff — are already pulling ahead.',
+      },
+      {
+        type: 'p',
+        text: 'Clarifi is a real-time AI meeting copilot built for sales reps who want to show up to every call fully prepared — whatever gets thrown at them. No bot joining your Zoom. No overlay on screen share. Just live support when you need it.',
+      },
+      {
+        type: 'cta',
+        text: 'Launching August 24, 2026.',
+        href: '/#join',
+        label: 'Join the waitlist →',
+      },
+      {
+        type: 'p',
+        text: "Have a take on this? We'd love to hear it — find us on X @Clarifi_ai.",
+      },
+    ],
+  },
+]
+
+export const BLOG_POST_SLUGS = BLOG_POSTS.map((post) => post.slug)
+
+export function getBlogPost(slug: string): BlogPost | undefined {
+  return BLOG_POSTS.find((post) => post.slug === slug)
+}

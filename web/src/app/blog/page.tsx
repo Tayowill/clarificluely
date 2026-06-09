@@ -1,37 +1,13 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { BlogNav } from '@/components/blog/BlogNav'
+import { BLOG_POSTS } from '@/lib/blog-posts'
 import '../landing-blog.css'
-
-const POSTS = [
-  {
-    slug: 'undetectable-ai-meetings',
-    title: 'Why undetectable AI changes how you run meetings',
-    excerpt:
-      'Real-time assistance without bots, without screen-share leaks, and without breaking flow.',
-    date: 'May 28, 2026',
-    readTime: '6 min read',
-  },
-  {
-    slug: 'real-time-vs-after',
-    title: 'Real-time AI vs. after-the-call notetakers',
-    excerpt:
-      'Post-meeting summaries are useful — but they cannot help you in the moment you need it most.',
-    date: 'May 15, 2026',
-    readTime: '4 min read',
-  },
-  {
-    slug: 'clarifi-launch',
-    title: 'Introducing Clarifi for Mac',
-    excerpt:
-      'Your invisible co-pilot for every conversation. Download free and connect in one click.',
-    date: 'Jun 1, 2026',
-    readTime: '3 min read',
-  },
-]
 
 export const metadata = {
   title: 'Blog — Clarifi',
-  description: 'News, guides, and product updates from the Clarifi team.',
+  description:
+    'Sales tips, meeting AI guides, and product updates from Clarifi — the invisible real-time co-pilot for every call.',
   alternates: { canonical: '/blog' },
 }
 
@@ -46,8 +22,17 @@ export default function BlogPage() {
       </header>
 
       <div className="blog-grid">
-        {POSTS.map((post) => (
-          <article key={post.slug} className="blog-card">
+        {BLOG_POSTS.map((post) => (
+          <article key={post.slug} className="blog-card blog-card-featured">
+            <Link href={`/blog/${post.slug}`} className="blog-card-image-link">
+              <Image
+                src={post.image}
+                alt={post.imageAlt}
+                width={900}
+                height={506}
+                className="blog-card-image"
+              />
+            </Link>
             <p className="blog-card-meta">
               {post.date} · {post.readTime}
             </p>
