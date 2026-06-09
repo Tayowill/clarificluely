@@ -2,13 +2,14 @@ import { app } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import * as path from 'path'
 import * as fs from 'fs'
+import { getSystemAudioCaptureMode } from './audioPreferences'
 
 let helperProcess: ChildProcess | null = null
 let audioBuffer: Buffer[] = []
 let onDataCallback: ((buffer: Buffer) => void) | null = null
 let flushTimer: NodeJS.Timeout | null = null
 
-const FLUSH_INTERVAL_MS = 2000
+const FLUSH_INTERVAL_MS = 5000
 const SAMPLE_RATE = 16000
 const CHANNELS = 1
 const BIT_DEPTH = 16
@@ -26,8 +27,9 @@ export function startSystemAudio(onData: (buffer: Buffer) => void): boolean {
   }
 
   onDataCallback = onData
+  const captureMode = getSystemAudioCaptureMode()
 
-  helperProcess = spawn(helperPath, [], {
+  helperProcess = spawn(helperPath, [captureMode], {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 

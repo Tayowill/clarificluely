@@ -6,8 +6,10 @@ import AVFoundation
 class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
     private var stream: SCStream?
     private var isRunning = false
+    private let captureMode: String
 
-    override init() {
+    init(captureMode: String) {
+        self.captureMode = captureMode
         super.init()
     }
 
@@ -17,17 +19,19 @@ class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
             onScreenWindowsOnly: false
         )
 
+        guard let display = content.displays.first else {
+            throw NSError(domain: "AudioCapture", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "No display found"
+            ])
+        }
+
         let config = SCStreamConfiguration()
         config.capturesAudio = true
         config.excludesCurrentProcessAudio = true
         config.sampleRate = 16000
         config.channelCount = 1
 
-        let filter = SCContentFilter(
-            display: content.displays[0],
-            excludingApplications: [],
-            exceptingWindows: []
-        )
+        let filter = buildFilter(content: content, display: display, mode: captureMode)
 
         stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream?.addStreamOutput(
@@ -38,7 +42,55 @@ class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
         try await stream?.startCapture()
         isRunning = true
 
-        FileHandle.standardError.write("AUDIO_STARTED\n".data(using: .utf8)!)
+        FileHandle.standardError.write("AUDIO_STARTED mode=\(captureMode)\n".data(using: .utf8)!)
+    }
+
+    private func buildFilter(
+        content: SCShareableContent,
+        display: SCDisplay,
+        mode: String
+    ) -> SCContentFilter {
+        if mode == "meeting" {
+            let meetingBundleIds: Set<String> = [
+                "us.zoom.xos",
+                "com.microsoft.teams2",
+                "com.microsoft.teams",
+                "com.tinyspeck.slackmacgap",
+                "com.hnc.Discord",
+                "com.apple.FaceTime",
+                "com.google.Chrome",
+                "com.google.Chrome.canary",
+                "company.thebrowser.Browser",
+                "com.brave.Browser",
+                "org.mozilla.firefox",
+                "com.apple.Safari",
+            ]
+
+            let meetingApps = content.applications.filter {
+                meetingBundleIds.contains($0.bundleIdentifier)
+            }
+
+            if !meetingApps.isEmpty {
+                let excluded = content.applications.filter {
+                    !meetingBundleIds.contains($0.bundleIdentifier)
+                }
+                return SCContentFilter(
+                    display: display,
+                    excludingApplications: excluded,
+                    exceptingWindows: []
+                )
+            }
+
+            FileHandle.standardError.write(
+                "AUDIO_FALLBACK display capture — no meeting app found\n".data(using: .utf8)!
+            )
+        }
+
+        return SCContentFilter(
+            display: display,
+            excludingApplications: [],
+            exceptingWindows: []
+        )
     }
 
     func stop() async throws {
@@ -88,7 +140,8 @@ class AudioCapture: NSObject, SCStreamDelegate, SCStreamOutput {
 @available(macOS 13.0, *)
 class Main {
     static func run() async {
-        let capture = AudioCapture()
+        let mode = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "meeting"
+        let capture = AudioCapture(captureMode: mode)
         do {
             try await capture.start()
             try await Task.sleep(nanoseconds: UInt64.max)

@@ -6,24 +6,42 @@ import fetch from 'node-fetch'
 import { getTranscriptionLanguage } from './audioPreferences'
 import { getGroqApiKey } from './keys'
 import { isProxyConfigured, proxyTranscribe } from './proxyClient'
+import { isTranscriptionDrainMode } from './transcriptionQueue'
 
 let isRecording = false
+let isPaused = false
 let transcriptCallback: ((text: string) => void) | null = null
 
 export function startRecording(onTranscript: (text: string) => void): void {
   isRecording = true
+  isPaused = false
   transcriptCallback = onTranscript
   console.log('Recording started - waiting for audio chunks from renderer')
 }
 
 export function stopRecording(): void {
   isRecording = false
+  isPaused = false
   transcriptCallback = null
   console.log('Recording stopped')
 }
 
+export function pauseRecording(): void {
+  if (!isRecording) return
+  isPaused = true
+}
+
+export function resumeRecording(): void {
+  if (!isRecording) return
+  isPaused = false
+}
+
 export function getIsRecording(): boolean {
   return isRecording
+}
+
+export function getIsPaused(): boolean {
+  return isPaused
 }
 
 function detectAudioFormat(buffer: Buffer): 'wav' | 'webm' {
@@ -33,12 +51,58 @@ function detectAudioFormat(buffer: Buffer): 'wav' | 'webm' {
   return 'webm'
 }
 
-export async function processAudioChunk(audioBase64: string): Promise<string | null> {
-  if (!isRecording) return null
+export type TranscribeOptions = {
+  source?: 'mic' | 'system'
+  prompt?: string
+}
+
+const MIN_WEBM_BYTES = 1_200
+const MIN_WAV_BYTES = 24_000
+const SYSTEM_SPEECH_RMS_MIN = 0.01
+
+export function wavRms(buffer: Buffer): number {
+  if (buffer.length < 48 || buffer.toString('ascii', 0, 4) !== 'RIFF') {
+    return 0
+  }
+
+  const pcm = buffer.subarray(44)
+  if (pcm.length < 4) return 0
+
+  let sumSquares = 0
+  const sampleCount = Math.floor(pcm.length / 2)
+  for (let i = 0; i + 1 < pcm.length; i += 2) {
+    const sample = pcm.readInt16LE(i) / 32768
+    sumSquares += sample * sample
+  }
+
+  return Math.sqrt(sumSquares / sampleCount)
+}
+
+export function wavHasSpeechEnergy(buffer: Buffer, minRms = SYSTEM_SPEECH_RMS_MIN): boolean {
+  if (buffer.length < 48 || buffer.toString('ascii', 0, 4) !== 'RIFF') {
+    return true
+  }
+
+  return wavRms(buffer) >= minRms
+}
+
+export async function processAudioChunk(
+  audioBase64: string,
+  options: TranscribeOptions = {},
+): Promise<string | null> {
+  if ((!isRecording || isPaused) && !isTranscriptionDrainMode()) return null
 
   try {
     const audioBuffer = Buffer.from(audioBase64, 'base64')
     const format = detectAudioFormat(audioBuffer)
+    const minBytes = format === 'wav' ? MIN_WAV_BYTES : MIN_WEBM_BYTES
+    if (audioBuffer.length < minBytes) {
+      return null
+    }
+
+    if (format === 'wav' && !wavHasSpeechEnergy(audioBuffer)) {
+      return null
+    }
     const extension = format === 'wav' ? 'wav' : 'webm'
     const contentType = format === 'wav' ? 'audio/wav' : 'audio/webm'
     const tmpFile = path.join(os.tmpdir(), `clarifi-${Date.now()}.${extension}`)
@@ -54,9 +118,14 @@ export async function processAudioChunk(audioBase64: string): Promise<string | n
     if (language && language !== 'auto') {
       formData.append('language', language)
     }
+    const prompt = options.prompt?.trim().slice(-220)
+    if (prompt) {
+      formData.append('prompt', prompt)
+    }
+    formData.append('temperature', '0')
 
     if (await isProxyConfigured()) {
-      const transcript = await proxyTranscribe(audioBase64, format, language)
+      const transcript = await proxyTranscribe(audioBase64, format, language, prompt)
       fs.unlinkSync(tmpFile)
       if (transcript) console.log('Transcript:', transcript)
       return transcript

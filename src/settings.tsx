@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { acceleratorToKeyLabels, keyboardEventToAccelerator } from './lib/keybindDisplay'
 import './settings.css'
 
 type ModelProvider = 'anthropic' | 'openai' | 'gemini' | 'groq' | 'custom'
@@ -33,6 +34,34 @@ type SettingsTab =
   | 'integrations'
   | 'keybinds'
   | 'audio'
+  | 'audio_sessions'
+  | 'history'
+
+type StoredAudioSession = {
+  id: string
+  title: string
+  createdAt: number
+  endedAt: number
+  transcript: Array<{ id: string; text: string; source: string; speaker?: string; at: number }>
+  recap: {
+    summary: string
+    highlights: string[]
+    actionItems: string[]
+    openQuestions: string[]
+    recapEmailDraft: string
+  } | null
+  chatMessages: Array<{ role: string; content: string }>
+}
+
+type ChatSession = {
+  id: string
+  title: string
+  createdAt: number
+  messages: { role: string; content: string }[]
+  archived?: boolean
+}
+
+type HistoryFilter = 'all' | 'active' | 'archived'
 
 type ConnectedAccount = {
   provider: string
@@ -163,6 +192,8 @@ const SETTINGS_TABS: SettingsTab[] = [
   'integrations',
   'keybinds',
   'audio',
+  'audio_sessions',
+  'history',
 ]
 
 const NAV_ITEMS: { id: SettingsTab; label: string; profile?: boolean }[] = [
@@ -172,23 +203,46 @@ const NAV_ITEMS: { id: SettingsTab; label: string; profile?: boolean }[] = [
   { id: 'integrations', label: 'Integrations' },
   { id: 'keybinds', label: 'Keybinds' },
   { id: 'audio', label: 'Audio' },
+  { id: 'audio_sessions', label: 'Audio Sessions' },
+  { id: 'history', label: 'History' },
 ]
 
-const KEYBINDS = [
-  { action: 'Show / hide overlay', keys: ['⌘', '⇧', 'Space'] },
-  { action: 'Ask or submit', keys: ['⌘', '↵'] },
-  { action: 'New chat', keys: ['⌘', 'R'] },
-  { action: 'Move overlay up', keys: ['⌘', '↑'] },
-  { action: 'Move overlay down', keys: ['⌘', '↓'] },
-  { action: 'Move overlay left', keys: ['⌘', '←'] },
-  { action: 'Move overlay right', keys: ['⌘', '→'] },
-]
+function formatHistoryTime(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 60_000) return 'just now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return `${Math.floor(diff / 86_400_000)}d ago`
+}
+
+type KeybindActionId =
+  | 'toggle_overlay'
+  | 'submit'
+  | 'new_chat'
+  | 'move_up'
+  | 'move_down'
+  | 'move_left'
+  | 'move_right'
+  | 'toggle_recording'
+  | 'toggle_history'
+  | 'open_settings'
+
+type KeybindDefinition = {
+  id: KeybindActionId
+  label: string
+  description: string
+  defaultAccelerator: string
+}
+
+type KeybindPreferences = Record<KeybindActionId, string>
 
 type AudioPreferences = {
   transcriptionLanguage: string
   outputLanguage: string
   preferredMicrophoneId: string
   preferredMicrophoneLabel: string
+  systemAudioCapture: 'meeting' | 'display'
+  transcriptionMode: 'dual' | 'group'
 }
 
 type MicDevice = {
@@ -303,11 +357,24 @@ export default function SettingsApp() {
     outputLanguage: 'en',
     preferredMicrophoneId: '',
     preferredMicrophoneLabel: '',
+    systemAudioCapture: 'meeting',
+    transcriptionMode: 'dual',
   })
   const [micDevices, setMicDevices] = useState<MicDevice[]>([])
   const [testMicStatus, setTestMicStatus] = useState<
     'idle' | 'testing' | 'success' | 'no-signal' | 'error'
   >('idle')
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [audioSessions, setAudioSessions] = useState<StoredAudioSession[]>([])
+  const [audioRenamingId, setAudioRenamingId] = useState<string | null>(null)
+  const [audioRenameDraft, setAudioRenameDraft] = useState('')
+  const [keybindDefinitions, setKeybindDefinitions] = useState<KeybindDefinition[]>([])
+  const [keybindAccelerators, setKeybindAccelerators] = useState<KeybindPreferences | null>(null)
+  const [recordingKeybindId, setRecordingKeybindId] = useState<KeybindActionId | null>(null)
+  const [keybindError, setKeybindError] = useState('')
 
   const loadPrefs = useCallback(async () => {
     setPrefsLoading(true)
@@ -341,6 +408,39 @@ export default function SettingsApp() {
     setAudioPrefs(data)
   }, [])
 
+  const loadChatHistory = useCallback(async () => {
+    const data = (await window.electronAPI.invoke('chat:history-load')) as { sessions?: ChatSession[] }
+    if (Array.isArray(data?.sessions)) {
+      setChatSessions(data.sessions)
+    }
+  }, [])
+
+  const loadAudioSessions = useCallback(async () => {
+    const data = (await window.electronAPI.invoke('audio-sessions:load')) as {
+      sessions?: StoredAudioSession[]
+    }
+    if (Array.isArray(data?.sessions)) {
+      setAudioSessions(data.sessions)
+    }
+  }, [])
+
+  const applyKeybindPrefs = useCallback((data: { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences }) => {
+    if (Array.isArray(data?.definitions)) {
+      setKeybindDefinitions(data.definitions)
+    }
+    if (data?.accelerators) {
+      setKeybindAccelerators(data.accelerators)
+    }
+  }, [])
+
+  const loadKeybindPrefs = useCallback(async () => {
+    const data = (await window.electronAPI.invoke('keybinds:prefs-load')) as {
+      definitions?: KeybindDefinition[]
+      accelerators?: KeybindPreferences
+    }
+    applyKeybindPrefs(data)
+  }, [applyKeybindPrefs])
+
   const refreshMicDevices = useCallback(async () => {
     try {
       if (!permissions?.microphone) {
@@ -365,6 +465,9 @@ export default function SettingsApp() {
     void loadProfile()
     void loadPermissions()
     void loadAudioPrefs()
+    void loadChatHistory()
+    void loadAudioSessions()
+    void loadKeybindPrefs()
 
     const params = new URLSearchParams(window.location.search)
     const initialTab = normalizeSettingsTab(params.get('tab'))
@@ -381,13 +484,63 @@ export default function SettingsApp() {
     window.electronAPI.on('audio:prefs-changed', (next) => {
       setAudioPrefs(next as AudioPreferences)
     })
+    window.electronAPI.on('chat:history-changed', (payload) => {
+      const data = payload as { sessions?: ChatSession[] }
+      if (Array.isArray(data?.sessions)) {
+        setChatSessions(data.sessions)
+      }
+    })
+    window.electronAPI.on('audio-sessions:changed', (payload) => {
+      const data = payload as { sessions?: StoredAudioSession[] }
+      if (Array.isArray(data?.sessions)) {
+        setAudioSessions(data.sessions)
+      }
+    })
+    window.electronAPI.on('keybinds:prefs-changed', (payload) => {
+      applyKeybindPrefs(payload as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences })
+    })
     window.electronAPI.on('prefs:changed', (next) => {
       const data = next as PublicPreferences
       setPrefs(data)
       const mode = data.modes.find((m) => m.id === selectedModeId)
       if (mode) setDraftPrompt(mode.systemPrompt)
     })
-  }, [loadPrefs, loadProfile, loadPermissions, loadAudioPrefs, selectedModeId])
+  }, [loadPrefs, loadProfile, loadPermissions, loadAudioPrefs, loadChatHistory, loadAudioSessions, loadKeybindPrefs, applyKeybindPrefs, selectedModeId])
+
+  useEffect(() => {
+    if (!recordingKeybindId) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (event.key === 'Escape') {
+        setRecordingKeybindId(null)
+        setKeybindError('')
+        return
+      }
+
+      const accelerator = keyboardEventToAccelerator(event)
+      if (!accelerator) return
+
+      void (async () => {
+        try {
+          const result = (await window.electronAPI.invoke('keybinds:prefs-save', {
+            action: recordingKeybindId,
+            accelerator,
+          })) as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences }
+          applyKeybindPrefs(result)
+          setRecordingKeybindId(null)
+          setKeybindError('')
+        } catch (err) {
+          setKeybindError(err instanceof Error ? err.message : 'Could not save shortcut')
+        }
+      })()
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [recordingKeybindId, applyKeybindPrefs])
 
   useEffect(() => {
     if (tab === 'audio') {
@@ -553,6 +706,14 @@ export default function SettingsApp() {
     void saveAudioPrefs({ outputLanguage: code })
   }
 
+  const handleSystemAudioCapture = (mode: 'meeting' | 'display') => {
+    void saveAudioPrefs({ systemAudioCapture: mode })
+  }
+
+  const handleTranscriptionMode = (mode: 'dual' | 'group') => {
+    void saveAudioPrefs({ transcriptionMode: mode })
+  }
+
   const handleMicChange = (deviceId: string) => {
     const device = micDevices.find((d) => d.deviceId === deviceId)
     void saveAudioPrefs({
@@ -619,6 +780,116 @@ export default function SettingsApp() {
     micDevices.find((d) => d.deviceId === audioPrefs.preferredMicrophoneId)?.label ||
     micDevices[0]?.label ||
     'Default microphone'
+
+  const filteredChatSessions = chatSessions.filter((session) => {
+    if (historyFilter === 'active') return !session.archived
+    if (historyFilter === 'archived') return Boolean(session.archived)
+    return true
+  })
+
+  const startRename = (session: ChatSession) => {
+    setRenamingId(session.id)
+    setRenameDraft(session.title)
+  }
+
+  const cancelRename = () => {
+    setRenamingId(null)
+    setRenameDraft('')
+  }
+
+  const saveRename = async (id: string) => {
+    const title = renameDraft.trim()
+    if (!title) {
+      cancelRename()
+      return
+    }
+    const result = (await window.electronAPI.invoke('chat:history-rename-session', {
+      id,
+      title,
+    })) as { sessions?: ChatSession[] }
+    if (Array.isArray(result?.sessions)) {
+      setChatSessions(result.sessions)
+    }
+    cancelRename()
+  }
+
+  const deleteSession = async (id: string) => {
+    const confirmed = window.confirm('Delete this chat permanently?')
+    if (!confirmed) return
+    const result = (await window.electronAPI.invoke('chat:history-delete-session', {
+      id,
+    })) as { sessions?: ChatSession[] }
+    if (Array.isArray(result?.sessions)) {
+      setChatSessions(result.sessions)
+    }
+  }
+
+  const toggleArchive = async (session: ChatSession) => {
+    const result = (await window.electronAPI.invoke('chat:history-archive-session', {
+      id: session.id,
+      archived: !session.archived,
+    })) as { sessions?: ChatSession[] }
+    if (Array.isArray(result?.sessions)) {
+      setChatSessions(result.sessions)
+    }
+  }
+
+  const openSessionInOverlay = (id: string) => {
+    void window.electronAPI.invoke('chat:history-open-session', { id })
+  }
+
+  const startAudioRename = (session: StoredAudioSession) => {
+    setAudioRenamingId(session.id)
+    setAudioRenameDraft(session.title)
+  }
+
+  const cancelAudioRename = () => {
+    setAudioRenamingId(null)
+    setAudioRenameDraft('')
+  }
+
+  const saveAudioRename = async (id: string) => {
+    const title = audioRenameDraft.trim()
+    if (!title) {
+      cancelAudioRename()
+      return
+    }
+    const result = (await window.electronAPI.invoke('audio-sessions:rename', {
+      id,
+      title,
+    })) as { sessions?: StoredAudioSession[] }
+    if (Array.isArray(result?.sessions)) {
+      setAudioSessions(result.sessions)
+    }
+    cancelAudioRename()
+  }
+
+  const deleteAudioSession = async (id: string) => {
+    const confirmed = window.confirm('Delete this audio session permanently?')
+    if (!confirmed) return
+    const result = (await window.electronAPI.invoke('audio-sessions:delete', {
+      id,
+    })) as { sessions?: StoredAudioSession[] }
+    if (Array.isArray(result?.sessions)) {
+      setAudioSessions(result.sessions)
+    }
+  }
+
+  const openAudioSessionInOverlay = (id: string) => {
+    void window.electronAPI.invoke('audio-sessions:open', { id })
+  }
+
+  const resetAllKeybinds = () => {
+    void window.electronAPI
+      .invoke('keybinds:reset-all')
+      .then((data) => applyKeybindPrefs(data as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences }))
+  }
+
+  const resetOneKeybind = (action: KeybindActionId) => {
+    void window.electronAPI
+      .invoke('keybinds:reset-one', { action })
+      .then((data) => applyKeybindPrefs(data as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences }))
+  }
 
   const renderPrefsLoading = () => <p className="settings-empty">Loading…</p>
 
@@ -1157,23 +1428,63 @@ export default function SettingsApp() {
           <>
             <h1 className="settings-section-title">Keybinds</h1>
             <p className="settings-section-desc">
-              Global shortcuts for the overlay. Custom keybinds are coming soon on paid plans.
+              Global shortcuts work anywhere on your Mac. Click a shortcut to change it, or reset to defaults.
             </p>
 
+            {recordingKeybindId && (
+              <p className="settings-keybind-recording">
+                Press a new key combination… <span className="settings-keybind-recording-hint">Esc to cancel</span>
+              </p>
+            )}
+            {keybindError && <p className="settings-keybind-error">{keybindError}</p>}
+
             <div className="settings-keybind-list">
-              {KEYBINDS.map((bind) => (
-                <div key={bind.action} className="settings-keybind-row">
-                  <span className="settings-keybind-action">{bind.action}</span>
-                  <div className="settings-keybind-keys">
-                    {bind.keys.map((key, i) => (
-                      <span key={`${bind.action}-${key}-${i}`} className="settings-kbd">
-                        {key}
-                      </span>
-                    ))}
+              {keybindDefinitions.map((bind) => {
+                const accelerator = keybindAccelerators?.[bind.id] ?? bind.defaultAccelerator
+                const labels = acceleratorToKeyLabels(accelerator)
+                const isRecording = recordingKeybindId === bind.id
+                return (
+                  <div key={bind.id} className="settings-keybind-row">
+                    <div className="settings-keybind-copy">
+                      <span className="settings-keybind-action">{bind.label}</span>
+                      <span className="settings-keybind-desc">{bind.description}</span>
+                    </div>
+                    <div className="settings-keybind-controls">
+                      <button
+                        type="button"
+                        className={`settings-keybind-keys-btn ${isRecording ? 'recording' : ''}`}
+                        onClick={() => {
+                          setKeybindError('')
+                          setRecordingKeybindId(bind.id)
+                        }}
+                      >
+                        {isRecording ? (
+                          <span className="settings-keybind-recording-label">Recording…</span>
+                        ) : (
+                          labels.map((key, i) => (
+                            <span key={`${bind.id}-${key}-${i}`} className="settings-kbd">
+                              {key}
+                            </span>
+                          ))
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-keybind-reset"
+                        onClick={() => resetOneKeybind(bind.id)}
+                        title="Reset to default"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
+
+            <button type="button" className="settings-btn small" onClick={resetAllKeybinds}>
+              Reset all to defaults
+            </button>
           </>
         )}
 
@@ -1231,6 +1542,72 @@ export default function SettingsApp() {
                   ))}
                 </select>
               </div>
+            </section>
+
+            <section className="settings-audio-section">
+              <h2 className="settings-audio-section-title">Transcription mode</h2>
+              <p className="settings-audio-section-desc">
+                Group calls use speaker diarization on system audio. One-on-one uses Me/Them labels.
+              </p>
+
+              <div className="settings-audio-row">
+                <div className="settings-audio-row-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <div className="settings-audio-row-text">
+                  <div className="settings-audio-row-title">Call type</div>
+                  <div className="settings-audio-row-desc">
+                    Group mode labels each participant (Speaker 1, 2, …). Dual mode uses Me and Them.
+                  </div>
+                </div>
+                <select
+                  className="settings-audio-select"
+                  value={audioPrefs.transcriptionMode}
+                  onChange={(e) =>
+                    handleTranscriptionMode(e.target.value === 'dual' ? 'dual' : 'group')
+                  }
+                >
+                  <option value="group">Group call (recommended)</option>
+                  <option value="dual">One-on-one (Me / Them)</option>
+                </select>
+              </div>
+            </section>
+
+            <section className="settings-audio-section">
+              <h2 className="settings-audio-section-title">Remote audio capture</h2>
+              <p className="settings-audio-section-desc">
+                Controls which system audio is captured during sessions.
+              </p>
+
+              <div className="settings-audio-row">
+                <div className="settings-audio-row-icon" aria-hidden>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
+                </div>
+                <div className="settings-audio-row-text">
+                  <div className="settings-audio-row-title">Capture source</div>
+                  <div className="settings-audio-row-desc">
+                    Meeting apps only (Zoom, Teams, Slack) reduces background noise from other tabs.
+                  </div>
+                </div>
+                <select
+                  className="settings-audio-select"
+                  value={audioPrefs.systemAudioCapture}
+                  onChange={(e) =>
+                    handleSystemAudioCapture(e.target.value === 'display' ? 'display' : 'meeting')
+                  }
+                >
+                  <option value="meeting">Meeting apps only (recommended)</option>
+                  <option value="display">Entire display audio</option>
+                </select>
+              </div>
+
             </section>
 
             <section className="settings-audio-section">
@@ -1299,6 +1676,197 @@ export default function SettingsApp() {
                 </p>
               )}
             </section>
+          </>
+        )}
+
+        {tab === 'audio_sessions' && (
+          <>
+            <h1 className="settings-section-title">Audio sessions</h1>
+            <p className="settings-section-desc">
+              Past meeting recordings with transcripts, recaps, and session-scoped AI chat. Open a session
+              in the overlay to review notes or ask questions about that recording only.
+            </p>
+
+            {audioSessions.length === 0 ? (
+              <p className="settings-empty">No audio sessions yet. Start and stop a session from the overlay.</p>
+            ) : (
+              <div className="settings-history-list">
+                {audioSessions.map((session) => (
+                  <div key={session.id} className="settings-history-row">
+                    <div className="settings-history-row-main">
+                      {audioRenamingId === session.id ? (
+                        <input
+                          className="settings-history-rename-input"
+                          value={audioRenameDraft}
+                          onChange={(e) => setAudioRenameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void saveAudioRename(session.id)
+                            if (e.key === 'Escape') cancelAudioRename()
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="settings-history-row-title">{session.title}</div>
+                      )}
+                      <div className="settings-history-row-meta">
+                        {formatHistoryTime(session.createdAt)}
+                        {' · '}
+                        {session.transcript.length} transcript line
+                        {session.transcript.length === 1 ? '' : 's'}
+                        {session.chatMessages.length > 0
+                          ? ` · ${session.chatMessages.length} chat message${session.chatMessages.length === 1 ? '' : 's'}`
+                          : ''}
+                      </div>
+                    </div>
+                    <div className="settings-history-row-actions">
+                      {audioRenamingId === session.id ? (
+                        <>
+                          <button
+                            type="button"
+                            className="settings-btn small primary"
+                            onClick={() => void saveAudioRename(session.id)}
+                          >
+                            Save
+                          </button>
+                          <button type="button" className="settings-btn small" onClick={cancelAudioRename}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="settings-btn small"
+                            onClick={() => openAudioSessionInOverlay(session.id)}
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn small"
+                            onClick={() => startAudioRename(session)}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn small danger"
+                            onClick={() => void deleteAudioSession(session.id)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'history' && (
+          <>
+            <h1 className="settings-section-title">Chat history</h1>
+            <p className="settings-section-desc">
+              All your overlay conversations. Open a chat in the overlay, rename it, archive it, or delete it.
+            </p>
+
+            <div className="settings-history-filters">
+              {(['all', 'active', 'archived'] as HistoryFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  className={`settings-history-filter ${historyFilter === filter ? 'active' : ''}`}
+                  onClick={() => setHistoryFilter(filter)}
+                >
+                  {filter === 'all' ? 'All' : filter === 'active' ? 'Active' : 'Archived'}
+                </button>
+              ))}
+            </div>
+
+            {filteredChatSessions.length === 0 ? (
+              <p className="settings-empty">No chats in this view yet.</p>
+            ) : (
+              <div className="settings-history-list">
+                {filteredChatSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className={`settings-history-row ${session.archived ? 'settings-history-row--archived' : ''}`}
+                  >
+                    <div className="settings-history-row-main">
+                      {renamingId === session.id ? (
+                        <input
+                          className="settings-history-rename-input"
+                          value={renameDraft}
+                          onChange={(e) => setRenameDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void saveRename(session.id)
+                            if (e.key === 'Escape') cancelRename()
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="settings-history-row-title">{session.title}</div>
+                      )}
+                      <div className="settings-history-row-meta">
+                        {formatHistoryTime(session.createdAt)}
+                        {' · '}
+                        {session.messages.length} message{session.messages.length === 1 ? '' : 's'}
+                        {session.archived ? ' · Archived' : ''}
+                      </div>
+                    </div>
+                    <div className="settings-history-row-actions">
+                      {renamingId === session.id ? (
+                        <>
+                          <button
+                            type="button"
+                            className="settings-btn small primary"
+                            onClick={() => void saveRename(session.id)}
+                          >
+                            Save
+                          </button>
+                          <button type="button" className="settings-btn small" onClick={cancelRename}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="settings-btn small"
+                            onClick={() => openSessionInOverlay(session.id)}
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn small"
+                            onClick={() => startRename(session)}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn small"
+                            onClick={() => void toggleArchive(session)}
+                          >
+                            {session.archived ? 'Restore' : 'Archive'}
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn small danger"
+                            onClick={() => void deleteSession(session.id)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </main>

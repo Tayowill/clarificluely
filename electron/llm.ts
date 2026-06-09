@@ -1,9 +1,19 @@
 import fetch from 'node-fetch'
 import { isProxyConfigured, proxyChat, proxySuggest } from './proxyClient'
 import {
+  CLARIFI_AUDIO_SESSION_CHAT_PROMPT,
   CLARIFI_ENTERPRISE_SYSTEM_PROMPT,
+  CLARIFI_SESSION_ANALYSIS_PROMPT,
+  CLARIFI_SESSION_RECAP_PROMPT,
+  CLARIFI_SPEAKER_INFERENCE_PROMPT,
   CLARIFI_SUGGESTIONS_SYSTEM_PROMPT,
 } from './prompts'
+import {
+  collectDiarizedSpeakers,
+  entriesToLines,
+  type SpeakerLabels,
+  type TranscriptEntry,
+} from './transcriptUtils'
 import { getOutputLanguageInstruction } from './audioPreferences'
 import {
   getActiveMode,
@@ -19,10 +29,50 @@ export interface Suggestion {
 
 let lastTranscript = ''
 let isProcessing = false
+let lastAnalysisTranscript = ''
+let isAnalyzing = false
 
 export function resetSuggestionState(): void {
   lastTranscript = ''
   isProcessing = false
+  lastAnalysisTranscript = ''
+  isAnalyzing = false
+}
+
+export interface SessionEntity {
+  name: string
+  type: 'person' | 'company' | 'other'
+}
+
+export interface LiveSessionInsights {
+  meetingIntro: string
+  runningSummary: string
+  topics: string[]
+  entities: SessionEntity[]
+  sentiment: 'positive' | 'neutral' | 'negative' | 'mixed'
+  keyMoments: string[]
+  decisions: string[]
+  openQuestions: string[]
+}
+
+export interface SessionRecap {
+  summary: string
+  /** @deprecated use discussionPoints — kept for older saved sessions */
+  highlights: string[]
+  discussionPoints: string[]
+  actionItems: string[]
+  decisions: string[]
+  openQuestions: string[]
+  recapEmailDraft: string
+}
+
+function parseJsonPayload<T>(text: string): T | null {
+  try {
+    const clean = text.replace(/```json|```/g, '').trim()
+    return JSON.parse(clean) as T
+  } catch {
+    return null
+  }
 }
 
 type LlmCallConfig = {
@@ -329,5 +379,171 @@ export async function generateSuggestions(
     return []
   } finally {
     isProcessing = false
+  }
+}
+
+export async function analyzeLiveSession(
+  transcriptLines: string[],
+): Promise<LiveSessionInsights | null> {
+  if (isAnalyzing) return null
+  if (transcriptLines.length === 0) return null
+
+  const transcript = transcriptLines.join('\n')
+  if (transcript === lastAnalysisTranscript) return null
+  lastAnalysisTranscript = transcript
+
+  isAnalyzing = true
+
+  try {
+    const activeMode = getActiveMode()
+    const outputLanguageHint = getOutputLanguageInstruction()
+    const systemPrompt = `${CLARIFI_SESSION_ANALYSIS_PROMPT}\n\nActive mode:\n${activeMode.systemPrompt}${outputLanguageHint}`
+
+    const text = await completeWithActiveModel(
+      systemPrompt,
+      `Live meeting transcript:\n${transcript}`,
+      800,
+    )
+    if (!text) return null
+
+    const parsed = parseJsonPayload<LiveSessionInsights>(text)
+    if (!parsed) return null
+
+    return {
+      meetingIntro: parsed.meetingIntro ?? '',
+      runningSummary: parsed.runningSummary ?? parsed.meetingIntro ?? '',
+      topics: Array.isArray(parsed.topics) ? parsed.topics : [],
+      entities: Array.isArray(parsed.entities) ? parsed.entities : [],
+      sentiment: parsed.sentiment ?? 'neutral',
+      keyMoments: Array.isArray(parsed.keyMoments) ? parsed.keyMoments : [],
+      decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+      openQuestions: Array.isArray(parsed.openQuestions) ? parsed.openQuestions : [],
+    }
+  } catch (err) {
+    console.error('Session analysis error:', err)
+    return null
+  } finally {
+    isAnalyzing = false
+  }
+}
+
+export async function generateSessionRecap(
+  transcriptLines: string[],
+): Promise<SessionRecap | null> {
+  if (transcriptLines.length === 0) return null
+
+  const transcript = transcriptLines.join('\n')
+  const outputLanguageHint = getOutputLanguageInstruction()
+  const systemPrompt = `${CLARIFI_SESSION_RECAP_PROMPT}${outputLanguageHint}`
+
+  try {
+    const text = await completeWithActiveModel(
+      systemPrompt,
+      `Full meeting transcript:\n${transcript}`,
+      1200,
+    )
+    if (!text) return null
+
+    const parsed = parseJsonPayload<SessionRecap>(text)
+    if (!parsed) return null
+
+    const discussionPoints = Array.isArray(parsed.discussionPoints)
+      ? parsed.discussionPoints
+      : Array.isArray(parsed.highlights)
+        ? parsed.highlights
+        : []
+
+    return {
+      summary: parsed.summary ?? '',
+      highlights: discussionPoints,
+      discussionPoints,
+      actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+      decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+      openQuestions: Array.isArray(parsed.openQuestions) ? parsed.openQuestions : [],
+      recapEmailDraft: parsed.recapEmailDraft ?? '',
+    }
+  } catch (err) {
+    console.error('Session recap error:', err)
+    return null
+  }
+}
+
+export async function inferSpeakerLabels(
+  entries: TranscriptEntry[],
+): Promise<SpeakerLabels> {
+  const diarized = collectDiarizedSpeakers(entries)
+  if (diarized.length === 0) return {}
+
+  const transcript = entriesToLines(entries).join('\n')
+  const outputLanguageHint = getOutputLanguageInstruction()
+  const systemPrompt = `${CLARIFI_SPEAKER_INFERENCE_PROMPT}${outputLanguageHint}`
+
+  try {
+    const text = await completeWithActiveModel(
+      systemPrompt,
+      `Group call transcript:\n${transcript}`,
+      400,
+    )
+    if (!text) return {}
+
+    const parsed = parseJsonPayload<{ labels?: SpeakerLabels }>(text)
+    const labels = parsed?.labels
+    if (!labels || typeof labels !== 'object') return {}
+
+    const result: SpeakerLabels = {}
+    for (const speaker of diarized) {
+      const value = labels[speaker]
+      if (typeof value === 'string' && value.trim()) {
+        result[speaker] = value.trim().slice(0, 48)
+      }
+    }
+    return result
+  } catch (err) {
+    console.error('Speaker inference error:', err)
+    return {}
+  }
+}
+
+export async function chatWithStoredAudioSession(
+  message: string,
+  transcriptLines: string[],
+  recap: SessionRecap | null,
+  speakerLabels?: SpeakerLabels,
+): Promise<ChatResult> {
+  const transcript =
+    transcriptLines.length > 0 ? transcriptLines.join('\n') : '(empty transcript)'
+
+  const discussionPoints =
+    recap?.discussionPoints?.length > 0 ? recap.discussionPoints : recap?.highlights ?? []
+
+  const recapBlock = recap
+    ? [
+        `Summary: ${recap.summary}`,
+        discussionPoints.length > 0
+          ? `Discussion points: ${discussionPoints.join('; ')}`
+          : '',
+        recap.actionItems.length > 0 ? `Action items: ${recap.actionItems.join('; ')}` : '',
+        (recap.decisions?.length ?? 0) > 0
+          ? `Decisions: ${recap.decisions!.join('; ')}`
+          : '',
+        recap.openQuestions.length > 0 ? `Open questions: ${recap.openQuestions.join('; ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : '(no recap generated)'
+
+  const outputLanguageHint = getOutputLanguageInstruction()
+  const systemPrompt = `${CLARIFI_AUDIO_SESSION_CHAT_PROMPT}${outputLanguageHint}`
+  const userText = `Meeting recap:\n${recapBlock}\n\nFull transcript:\n${transcript}\n\nUser question:\n${message}`
+
+  try {
+    const reply = await completeWithActiveModel(systemPrompt, userText, 1024)
+    if (!reply) {
+      return { error: 'empty_reply' }
+    }
+    return { reply }
+  } catch (err) {
+    console.error('Audio session chat error:', err)
+    return { error: 'chat_failed' }
   }
 }

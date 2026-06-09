@@ -4,8 +4,10 @@
 
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import {
+  getIsPaused,
   getIsRecording,
-  processAudioChunk,
+  pauseRecording,
+  resumeRecording,
   startRecording,
   stopRecording,
 } from '../audio'
@@ -23,7 +25,39 @@ import {
 } from '../overlay'
 
 let screenContextEnabled = false
-import { chatWithMeetingContext, generateSuggestions, resetSuggestionState } from '../llm'
+import {
+  analyzeLiveSession,
+  chatWithMeetingContext,
+  chatWithStoredAudioSession,
+  generateSessionRecap,
+  generateSuggestions,
+  inferSpeakerLabels,
+  resetSuggestionState,
+  type SessionRecap,
+} from '../llm'
+import {
+  deleteAudioSession,
+  getAudioSessionById,
+  loadAudioSessions,
+  renameAudioSession,
+  saveAudioSession,
+  updateAudioSessionChat,
+  updateAudioSessionSpeakerLabels,
+  type AudioSessionChatMessage,
+  type StoredAudioSession,
+} from '../audioSessionHistory'
+import {
+  clearTranscriptionQueue,
+  configureTranscriptionQueue,
+  enqueueTranscription,
+  flushTranscriptionQueue,
+} from '../transcriptionQueue'
+import {
+  entriesToLines,
+  normalizeTranscriptEntry,
+  type TranscriptEntry,
+  type TranscriptSource,
+} from '../transcriptUtils'
 import { captureScreenForContext } from '../screenCapture'
 import { startSystemAudio, stopSystemAudio } from '../systemAudio'
 import {
@@ -55,12 +89,25 @@ import {
 import { getClarifiApiUrl } from '../keys'
 import { getKey, saveKey } from '../store'
 import {
+  archiveChatSession,
   clearChatSessions,
   deleteChatSession,
+  getChatSessionById,
   loadChatSessions,
+  renameChatSession,
   saveChatSession,
   type ChatSession,
 } from '../chatHistory'
+import {
+  loadKeybindPreferences,
+  resetKeybind,
+  resetKeybindPreferences,
+  saveKeybindPreferences,
+  toPublicKeybindPreferences,
+  validateKeybindAssignment,
+  type KeybindActionId,
+} from '../keybindPreferences'
+import { registerKeybinds } from '../keybindManager'
 import {
   eraseLocalAccountData,
   logoutDevice,
@@ -86,8 +133,11 @@ import {
   type ModelProvider,
 } from '../userPreferences'
 
-let transcriptLines: string[] = []
+let sessionTranscriptEntries: TranscriptEntry[] = []
 let suggestionCounter = 0
+let onSystemAudioData: ((buffer: Buffer) => void) | null = null
+
+const SESSION_TRANSCRIPT_MAX = 500
 
 const MAX_STRING_LENGTH = 50_000
 const HTML_TAG_REGEX = /<[^>]*>/g
@@ -259,18 +309,47 @@ async function updateSuggestionsForOverlay(
   }
 }
 
-function handleTranscript(text: string): void {
-  transcriptLines.push(text)
-  if (transcriptLines.length > 50) {
-    transcriptLines = transcriptLines.slice(-50)
-  }
-
+function broadcastTranscriptUpdate(): void {
+  const recent = sessionTranscriptEntries.slice(-50)
   const overlay = getOverlayWindow()
   if (overlay && !overlay.isDestroyed()) {
-    overlay.webContents.send('transcript:update', transcriptLines)
+    overlay.webContents.send('transcript:update', {
+      recent,
+      full: sessionTranscriptEntries,
+    })
   }
+  void updateSuggestionsForOverlay(entriesToLines(sessionTranscriptEntries))
+}
 
-  void updateSuggestionsForOverlay(transcriptLines)
+function pushTranscriptEntry(entry: TranscriptEntry): void {
+  sessionTranscriptEntries.push(normalizeTranscriptEntry(entry))
+  sessionTranscriptEntries.sort((a, b) => a.at - b.at)
+  if (sessionTranscriptEntries.length > SESSION_TRANSCRIPT_MAX) {
+    sessionTranscriptEntries = sessionTranscriptEntries.slice(-SESSION_TRANSCRIPT_MAX)
+  }
+  broadcastTranscriptUpdate()
+}
+
+function pruneTranscriptEntries(entryIds: string[]): void {
+  if (entryIds.length === 0) return
+  const remove = new Set(entryIds)
+  const before = sessionTranscriptEntries.length
+  sessionTranscriptEntries = sessionTranscriptEntries.filter((entry) => !remove.has(entry.id))
+  if (sessionTranscriptEntries.length !== before) {
+    broadcastTranscriptUpdate()
+  }
+}
+
+function getSessionTranscript(): string[] {
+  return entriesToLines(sessionTranscriptEntries)
+}
+
+function getSessionTranscriptEntries(): TranscriptEntry[] {
+  return [...sessionTranscriptEntries]
+}
+
+function enqueueAudioChunk(base64: string, source: TranscriptSource): void {
+  enqueueTranscription(base64, source)
 }
 
 let handlersRegistered = false
@@ -360,6 +439,201 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { sessions }
   })
 
+  registerValidatedHandler(
+    'chat:history-rename-session',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string; title?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      if (!payload.title || typeof payload.title !== 'string') {
+        throw new Error('title is required')
+      }
+      const sessions = renameChatSession(payload.id, payload.title)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'chat:history-archive-session',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string; archived?: boolean }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      const sessions = archiveChatSession(payload.id, Boolean(payload.archived))
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'chat:history-open-session',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      const session = getChatSessionById(payload.id)
+      if (!session) {
+        throw new Error('session not found')
+      }
+      const overlay = getOverlayWindow()
+      if (overlay && !overlay.isDestroyed()) {
+        overlay.show()
+        overlay.focus()
+        overlay.webContents.send('chat:session-open', session)
+      }
+      return { ok: true }
+    },
+  )
+
+  ipcMain.handle('audio-sessions:load', () => {
+    return { sessions: loadAudioSessions() }
+  })
+
+  registerValidatedHandler(
+    'audio-sessions:save',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { session?: StoredAudioSession }
+      if (!payload.session || typeof payload.session !== 'object') {
+        throw new Error('session is required')
+      }
+      const session = payload.session
+      if (typeof session.id !== 'string' || typeof session.title !== 'string') {
+        throw new Error('invalid session')
+      }
+      const sessions = saveAudioSession(session)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:delete',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      const sessions = deleteAudioSession(payload.id)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:rename',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string; title?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      if (!payload.title || typeof payload.title !== 'string') {
+        throw new Error('title is required')
+      }
+      const sessions = renameAudioSession(payload.id, payload.title)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:update-chat',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string; messages?: AudioSessionChatMessage[] }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      if (!Array.isArray(payload.messages)) {
+        throw new Error('messages is required')
+      }
+      const sessions = updateAudioSessionChat(payload.id, payload.messages)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:update-speaker-labels',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string; speakerLabels?: Record<string, string> }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      if (!payload.speakerLabels || typeof payload.speakerLabels !== 'object') {
+        throw new Error('speakerLabels is required')
+      }
+      const speakerLabels: Record<string, string> = {}
+      for (const [key, value] of Object.entries(payload.speakerLabels)) {
+        if (typeof key === 'string' && typeof value === 'string' && value.trim()) {
+          speakerLabels[key] = value.trim().slice(0, 48)
+        }
+      }
+      const sessions = updateAudioSessionSpeakerLabels(payload.id, speakerLabels)
+      return { sessions }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:open',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { id?: string }
+      if (!payload.id || typeof payload.id !== 'string') {
+        throw new Error('id is required')
+      }
+      const session = getAudioSessionById(payload.id)
+      if (!session) {
+        throw new Error('session not found')
+      }
+      const overlay = getOverlayWindow()
+      if (overlay && !overlay.isDestroyed()) {
+        overlay.show()
+        overlay.focus()
+        overlay.webContents.send('audio-sessions:open', session)
+      }
+      return { ok: true }
+    },
+  )
+
+  registerValidatedHandler(
+    'audio-sessions:chat',
+    { rateLimitKey: 'audio-sessions:chat', rateLimit: LLM_RATE_LIMIT },
+    async (data) => {
+      const payload = data as {
+        message?: string
+        transcriptLines?: string[]
+        recap?: SessionRecap | null
+        speakerLabels?: Record<string, string>
+      }
+      if (!payload.message || typeof payload.message !== 'string') {
+        throw new Error('message is required')
+      }
+      const lines = Array.isArray(payload.transcriptLines)
+        ? payload.transcriptLines.filter((line): line is string => typeof line === 'string')
+        : []
+      const recap =
+        payload.recap && typeof payload.recap === 'object' ? payload.recap : null
+      const speakerLabels =
+        payload.speakerLabels && typeof payload.speakerLabels === 'object'
+          ? payload.speakerLabels
+          : undefined
+      return chatWithStoredAudioSession(payload.message, lines, recap, speakerLabels)
+    },
+  )
+
+  registerValidatedHandler(
+    'llm:infer-speaker-labels',
+    { rateLimitKey: 'llm:infer-speaker-labels', rateLimit: LLM_RATE_LIMIT },
+    async () => {
+      return inferSpeakerLabels(getSessionTranscriptEntries())
+    },
+  )
+
   ipcMain.handle('overlay:toggle-follow', () => {
     return { enabled: toggleOverlayFollow() }
   })
@@ -408,52 +682,88 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return generateSuggestions(lines)
   })
 
+  registerValidatedHandler(
+    'llm:session-analyze',
+    { rateLimitKey: 'llm:session-analyze', rateLimit: LLM_RATE_LIMIT },
+    async () => analyzeLiveSession(getSessionTranscript()),
+  )
+
+  registerValidatedHandler(
+    'llm:session-recap',
+    { rateLimitKey: 'llm:session-recap', rateLimit: LLM_RATE_LIMIT },
+    async () => generateSessionRecap(getSessionTranscript()),
+  )
+
+  ipcMain.handle('audio:session-transcript', () => getSessionTranscriptEntries())
+
   ipcMain.handle('audio:start', async () => {
-    transcriptLines = []
+    sessionTranscriptEntries = []
     suggestionCounter = 0
     resetSuggestionState()
+    clearTranscriptionQueue()
+
+    configureTranscriptionQueue({
+      getEntries: getSessionTranscriptEntries,
+      onEntry: pushTranscriptEntry,
+      onPruneEntries: pruneTranscriptEntries,
+    })
 
     const overlay = getOverlayWindow()
     if (overlay && !overlay.isDestroyed()) {
-      overlay.webContents.send('transcript:update', [])
+      overlay.webContents.send('transcript:update', { recent: [], full: [] })
       overlay.webContents.send('suggestions:update', [])
     }
 
-    startRecording((text: string) => {
-      handleTranscript(text)
+    startRecording(() => {
+      // Transcripts are delivered through the transcription queue.
     })
 
     if (process.platform === 'darwin') {
-      startSystemAudio(async (wavBuffer: Buffer) => {
+      onSystemAudioData = (wavBuffer: Buffer) => {
         const base64 = wavBuffer.toString('base64')
-        const transcript = await processAudioChunk(base64)
-        if (transcript && transcript.length > 2) {
-          handleTranscript(transcript)
-        }
-      })
+        enqueueAudioChunk(base64, 'system')
+      }
+      startSystemAudio(onSystemAudioData)
     }
 
     return { status: 'started' }
   })
 
-  ipcMain.handle('audio:stop', async () => {
-    stopRecording()
+  ipcMain.handle('audio:pause', () => {
+    pauseRecording()
     stopSystemAudio()
+    return { status: 'paused', isPaused: getIsPaused() }
+  })
+
+  ipcMain.handle('audio:resume', () => {
+    resumeRecording()
+    if (process.platform === 'darwin' && onSystemAudioData) {
+      startSystemAudio(onSystemAudioData)
+    }
+    return { status: 'resumed', isPaused: getIsPaused() }
+  })
+
+  ipcMain.handle('audio:stop', async () => {
+    stopSystemAudio()
+    stopRecording()
+    onSystemAudioData = null
+    await flushTranscriptionQueue()
+    clearTranscriptionQueue()
     return { status: 'stopped' }
   })
 
   ipcMain.handle('audio:status', () => {
-    return { isRecording: getIsRecording() }
+    return { isRecording: getIsRecording(), isPaused: getIsPaused() }
   })
 
-  ipcMain.handle('audio:chunk', (_event, audioBase64: string) => {
-    void (async () => {
-      const transcript = await processAudioChunk(audioBase64)
-      if (transcript && transcript.length > 2) {
-        handleTranscript(transcript)
-      }
-    })()
-    return { status: 'processing' }
+  ipcMain.handle('audio:chunk', (_event, payload: string | { base64?: string; source?: string }) => {
+    const base64 = typeof payload === 'string' ? payload : payload?.base64
+    const source: TranscriptSource =
+      typeof payload === 'object' && payload?.source === 'system' ? 'system' : 'mic'
+    if (typeof base64 === 'string' && base64.length > 0) {
+      enqueueAudioChunk(base64, source)
+    }
+    return { status: 'queued' }
   })
 
   registerValidatedHandler(
@@ -883,6 +1193,18 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
           typeof payload.preferredMicrophoneLabel === 'string'
             ? payload.preferredMicrophoneLabel
             : current.preferredMicrophoneLabel,
+        systemAudioCapture:
+          payload.systemAudioCapture === 'display'
+            ? 'display'
+            : payload.systemAudioCapture === 'meeting'
+              ? 'meeting'
+              : current.systemAudioCapture,
+        transcriptionMode:
+          payload.transcriptionMode === 'dual'
+            ? 'dual'
+            : payload.transcriptionMode === 'group'
+              ? 'group'
+              : current.transcriptionMode,
       }
       saveAudioPreferences(next)
       return next
@@ -907,6 +1229,53 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
   registerValidatedHandler('app:erase-account-data', {}, async () => {
     await eraseLocalAccountData()
     return { ok: true }
+  })
+
+  ipcMain.handle('keybinds:prefs-load', () => {
+    return toPublicKeybindPreferences()
+  })
+
+  registerValidatedHandler(
+    'keybinds:prefs-save',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { action?: KeybindActionId; accelerator?: string }
+      if (!payload.action || typeof payload.action !== 'string') {
+        throw new Error('action is required')
+      }
+      if (!payload.accelerator || typeof payload.accelerator !== 'string') {
+        throw new Error('accelerator is required')
+      }
+      const current = loadKeybindPreferences()
+      const error = validateKeybindAssignment(payload.action, payload.accelerator, current)
+      if (error) {
+        throw new Error(error)
+      }
+      const next = { ...current, [payload.action]: payload.accelerator }
+      const saved = saveKeybindPreferences(next)
+      registerKeybinds(saved)
+      return toPublicKeybindPreferences()
+    },
+  )
+
+  registerValidatedHandler(
+    'keybinds:reset-one',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { action?: KeybindActionId }
+      if (!payload.action || typeof payload.action !== 'string') {
+        throw new Error('action is required')
+      }
+      const saved = resetKeybind(payload.action)
+      registerKeybinds(saved)
+      return toPublicKeybindPreferences()
+    },
+  )
+
+  registerValidatedHandler('keybinds:reset-all', {}, () => {
+    const saved = resetKeybindPreferences()
+    registerKeybinds(saved)
+    return toPublicKeybindPreferences()
   })
 
   handlersRegistered = true

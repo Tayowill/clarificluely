@@ -2,11 +2,17 @@ import { app, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 
+export type SystemAudioCaptureMode = 'meeting' | 'display'
+
+export type TranscriptionMode = 'dual' | 'group'
+
 export type AudioPreferences = {
   transcriptionLanguage: string
   outputLanguage: string
   preferredMicrophoneId: string
   preferredMicrophoneLabel: string
+  systemAudioCapture: SystemAudioCaptureMode
+  transcriptionMode: TranscriptionMode
 }
 
 const PREFS_FILE = 'audio-preferences.json'
@@ -16,6 +22,8 @@ const DEFAULTS: AudioPreferences = {
   outputLanguage: 'en',
   preferredMicrophoneId: '',
   preferredMicrophoneLabel: '',
+  systemAudioCapture: 'meeting',
+  transcriptionMode: 'dual',
 }
 
 const OUTPUT_LANGUAGE_LABELS: Record<string, string> = {
@@ -53,6 +61,9 @@ export function loadAudioPreferences(): AudioPreferences {
         typeof parsed.preferredMicrophoneLabel === 'string'
           ? parsed.preferredMicrophoneLabel
           : DEFAULTS.preferredMicrophoneLabel,
+      systemAudioCapture:
+        parsed.systemAudioCapture === 'display' ? 'display' : 'meeting',
+      transcriptionMode: parsed.transcriptionMode === 'dual' ? 'dual' : 'group',
     }
     return cached
   } catch {
@@ -74,6 +85,22 @@ export function saveAudioPreferences(prefs: AudioPreferences): void {
 
 export function getTranscriptionLanguage(): string {
   return loadAudioPreferences().transcriptionLanguage
+}
+
+export function getSystemAudioCaptureMode(): SystemAudioCaptureMode {
+  return loadAudioPreferences().systemAudioCapture
+}
+
+export function getTranscriptionMode(): TranscriptionMode {
+  return loadAudioPreferences().transcriptionMode
+}
+
+export function isGroupCallMode(): boolean {
+  return getTranscriptionMode() === 'group'
+}
+
+export function isDualCallMode(): boolean {
+  return getTranscriptionMode() === 'dual'
 }
 
 export function getOutputLanguage(): string {
