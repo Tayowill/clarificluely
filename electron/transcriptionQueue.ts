@@ -10,6 +10,7 @@ import {
   isLikelyHallucination,
   isNearDuplicate,
   normalizeTranscriptText,
+  speakerLabel,
   type TranscriptEntry,
   type TranscriptSource,
 } from './transcriptUtils'
@@ -43,6 +44,8 @@ const ACTIVITY_SILENCE_MS = 6000
 
 export const MIC_SPEECH_RMS_MIN = 0.008
 export const MIC_USER_SPEECH_RMS = 0.022
+const MIC_USER_SPEECH_RMS_CAPTURE = 0.06
+const MIC_USER_SYSTEM_RATIO = 2.5
 const SYSTEM_SPEECH_RMS_MIN = 0.004
 
 type SpeechWindow = {
@@ -202,6 +205,22 @@ function hasRecentSystemEnergy(at: number): boolean {
   )
 }
 
+function isClearlyUserMicSpeech(
+  micRms: number,
+  maxSystemRms: number,
+  captureActive: boolean,
+): boolean {
+  if (!captureActive) {
+    return micRms >= MIC_USER_SPEECH_RMS
+  }
+
+  const systemFloor = Math.max(maxSystemRms, SYSTEM_SPEECH_RMS_MIN)
+  return (
+    micRms >= MIC_USER_SPEECH_RMS_CAPTURE &&
+    micRms >= systemFloor * MIC_USER_SYSTEM_RATIO
+  )
+}
+
 function resolveMicEntryTarget(chunk: QueuedChunk): {
   speaker: string
   source: TranscriptSource
@@ -213,25 +232,29 @@ function resolveMicEntryTarget(chunk: QueuedChunk): {
   const micRms = chunk.rms ?? 0
   const captureActive = isSystemCaptureSessionActive(chunk.enqueuedAt)
   const maxSystemRms = getMaxRecentSystemRms(chunk.enqueuedAt)
-  const systemEnergy = hasRecentSystemEnergy(chunk.enqueuedAt)
 
-  const userSpeaking = captureActive
-    ? micRms >= 0.04 &&
-      micRms >= Math.max(maxSystemRms, SYSTEM_SPEECH_RMS_MIN) * 2
-    : micRms >= MIC_USER_SPEECH_RMS
-
-  if (userSpeaking) {
+  if (isClearlyUserMicSpeech(micRms, maxSystemRms, captureActive)) {
     return { speaker: 'Me', source: 'mic' }
   }
 
-  const speakerBleedRange =
-    micRms >= MIC_SPEECH_RMS_MIN && micRms < (captureActive ? 0.04 : MIC_USER_SPEECH_RMS)
-
-  if (systemEnergy || (captureActive && speakerBleedRange)) {
+  if (captureActive || hasRecentSystemEnergy(chunk.enqueuedAt)) {
     return { speaker: 'Them', source: 'system' }
   }
 
   return { speaker: 'Me', source: 'mic' }
+}
+
+function micMatchesRecentThem(
+  transcript: string,
+  chunk: QueuedChunk,
+  entries: TranscriptEntry[],
+): boolean {
+  for (const entry of entries.slice(-24).reverse()) {
+    if (speakerLabel(entry) !== 'Them') continue
+    if (Math.abs(entry.at - chunk.enqueuedAt) > MIC_BLEED_WINDOW_MS) continue
+    if (isNearDuplicate(transcript, entry.text)) return true
+  }
+  return false
 }
 
 function hasRecentSpeech(): boolean {
@@ -259,13 +282,7 @@ function shouldSkipMicBleed(
 ): boolean {
   if (!isDualCallMode()) return false
 
-  if (systemSpeechOverlapsMic(chunk.enqueuedAt)) {
-    for (const entry of entries.slice(-24).reverse()) {
-      if (entry.source !== 'system') continue
-      if (Math.abs(entry.at - chunk.enqueuedAt) > MIC_BLEED_WINDOW_MS) continue
-      if (isNearDuplicate(transcript, entry.text)) return true
-    }
-  }
+  if (micMatchesRecentThem(transcript, chunk, entries)) return true
 
   return isDuplicateAcrossStreams(transcript, entries, chunk.enqueuedAt, 'mic')
 }
@@ -399,10 +416,8 @@ async function processMicChunk(chunk: QueuedChunk): Promise<void> {
     return
   }
   const target = resolveMicEntryTarget(chunk)
-  if (
-    target.source === 'mic' &&
-    shouldSkipMicBleed(transcript, chunk, entries)
-  ) {
+
+  if (shouldSkipMicBleed(transcript, chunk, entries)) {
     updateActivityState()
     return
   }
