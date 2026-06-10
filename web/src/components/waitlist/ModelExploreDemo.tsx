@@ -10,7 +10,7 @@ import {
   groupBuiltinModelsByProvider,
   type BuiltinModel,
   type ModelProvider,
-} from '@shared/builtin-models'
+} from '@/lib/builtin-models'
 
 export function ModelExploreDemo() {
   const groups = useMemo(() => groupBuiltinModelsByProvider(BUILTIN_MODELS), [])
