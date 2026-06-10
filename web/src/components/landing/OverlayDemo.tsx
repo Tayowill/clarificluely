@@ -45,7 +45,6 @@ export type OverlayDemoProps = {
   demoRef?: Ref<OverlayDemoHandle>
   initialMessages?: ChatMessage[]
   defaultPanelMode?: PanelMode
-  defaultModelLabel?: string
   defaultModeLabel?: string
 }
 
@@ -199,15 +198,12 @@ export function OverlayDemo({
   demoRef,
   initialMessages = [],
   defaultPanelMode = 'bar',
-  defaultModelLabel = 'Fable 5',
   defaultModeLabel = 'General',
 }: OverlayDemoProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
-  const modelMenuRef = useRef<HTMLDivElement>(null)
 
   const [panelMode, setPanelMode] = useState<PanelMode>(defaultPanelMode)
-  const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [thinking, setThinking] = useState(false)
@@ -221,17 +217,6 @@ export function OverlayDemo({
 
   const hasChat = messages.length > 0
   const canInteract = interactive
-
-  useEffect(() => {
-    if (!modelMenuOpen) return
-    const onPointerDown = (e: PointerEvent) => {
-      if (!modelMenuRef.current?.contains(e.target as Node)) {
-        setModelMenuOpen(false)
-      }
-    }
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => window.removeEventListener('pointerdown', onPointerDown)
-  }, [modelMenuOpen])
 
   useEffect(() => {
     if (!isRecording) {
@@ -334,12 +319,10 @@ export function OverlayDemo({
 
   const toggleSessions = () => {
     setPanelMode((m) => (m === 'sessions' ? 'bar' : 'sessions'))
-    setModelMenuOpen(false)
   }
 
   const toggleHistory = () => {
     setPanelMode((m) => (m === 'history' ? 'bar' : 'history'))
-    setModelMenuOpen(false)
   }
 
   const renderToolbar = () => (
@@ -347,30 +330,6 @@ export function OverlayDemo({
       <div className="od-toolbar-left">
         <div className={`od-dot ${isRecording ? 'recording' : ''}`} />
         <span className="od-brand">Clarifi</span>
-
-        <div className="od-pill-wrap" ref={modelMenuRef}>
-          <button
-            type="button"
-            className={`od-pill ${modelMenuOpen ? 'active' : ''}`}
-            onClick={() => canInteract && setModelMenuOpen((v) => !v)}
-            disabled={!canInteract}
-            aria-expanded={modelMenuOpen}
-          >
-            <span className="od-pill-label">{defaultModelLabel}</span>
-            <span className="od-pill-chevron">▼</span>
-          </button>
-          {modelMenuOpen && (
-            <div className="od-model-menu">
-              <button
-                type="button"
-                className="od-model-item"
-                onClick={() => setModelMenuOpen(false)}
-              >
-                All models
-              </button>
-            </div>
-          )}
-        </div>
 
         <ToolbarTip label="Change mode & system prompt">
           <button type="button" className="od-pill od-mode-pill" disabled={!canInteract}>

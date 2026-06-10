@@ -303,14 +303,19 @@
 
 .waitlist-features-section .landing-undetect-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+  gap: 1rem;
 }
 
 .waitlist-features-section .landing-undetect-feature {
   min-width: 0;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 1.15rem;
 }
 
 .waitlist-features-section .landing-undetect-visual {
@@ -340,12 +345,21 @@
 }
 
 @media (max-width: 900px) {
+  .waitlist-features-section .landing-undetect-grid {
+    max-width: 360px;
+  }
+
   .waitlist-features-section .landing-undetect-feature {
-    max-width: 520px;
+    max-width: none;
     width: 100%;
     margin-left: auto;
     margin-right: auto;
   }
+}
+
+.waitlist-features-section .landing-move-widget {
+  transform: scale(0.92);
+  width: 100%;
 }
 
 .waitlist-features-section .landing-undetect-feature.grad-teal {

@@ -132,6 +132,23 @@
   color: #1a1a2e;
 }
 
+.waitlist-launched-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.waitlist-launched-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 220px;
+  text-decoration: none;
+}
+
 .waitlist-form {
   display: flex;
   flex-direction: column;
@@ -264,6 +281,25 @@
   color: #64748b;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.waitlist-faq {
+  padding-top: 2.5rem;
+  padding-bottom: 3.5rem;
+  background: #fff;
+}
+
+.waitlist-faq .landing-section-header {
+  margin-bottom: 0.5rem;
+}
+
+.waitlist-faq .landing-section-header h2 {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  letter-spacing: -0.03em;
+}
+
+.waitlist-faq .landing-faq-item:first-child {
+  border-top: 1px solid var(--cl-border);
 }
 
 @media (max-width: 520px) {

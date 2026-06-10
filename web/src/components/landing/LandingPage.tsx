@@ -5,8 +5,12 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { ComingSoonModal } from './ComingSoonModal'
 import { InstallModal } from './InstallModal'
+import { HowItWorksSection } from './HowItWorksSection'
+import { ClarifiBentoSection } from './ClarifiBentoSection'
+import { FaqSection } from './FaqSection'
 import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
 import { ScreenShareCompare } from './ScreenShareCompare'
+import { useScrollReveal } from './useScrollReveal'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import '@/components/waitlist/waitlist.css'
 import './landing.css'
@@ -14,33 +18,6 @@ import './landing.css'
 type LandingPageProps = {
   macDownloadUrl: string
 }
-
-const FAQ_ITEMS = [
-  {
-    q: 'Why real-time vs. a regular AI notetaker?',
-    a: 'Clarifi helps you during the call — suggesting what to say, answering questions, and capturing context live — not just after the meeting ends.',
-  },
-  {
-    q: 'Who is Clarifi for?',
-    a: 'Sales calls, interviews, client meetings, lectures — anyone who wants an invisible AI co-pilot in the moment.',
-  },
-  {
-    q: 'Is Clarifi free?',
-    a: 'Yes. Start free with 5 sessions per day. Upgrade to Pro for unlimited sessions and advanced features.',
-  },
-  {
-    q: 'How is it undetectable in meetings?',
-    a: 'Clarifi never joins as a bot, stays invisible on screen share, and runs as a lightweight desktop overlay you control.',
-  },
-  {
-    q: 'What languages and apps are supported?',
-    a: 'English transcription today with more languages coming. Works alongside Zoom, Meet, Teams, Slack, and any desktop app.',
-  },
-  {
-    q: 'Can I talk to customer support?',
-    a: 'Reach us anytime at tayowilliams23@gmail.com — we typically respond within 24 hours.',
-  },
-]
 
 const TESTIMONIALS = [
   {
@@ -144,41 +121,6 @@ function JoinWaitlistButton({
   )
 }
 
-function RecordingTimer() {
-  const [seconds, setSeconds] = useState(14)
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setSeconds((s) => (s >= 59 ? 0 : s + 1))
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [])
-
-  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
-  const ss = String(seconds % 60).padStart(2, '0')
-
-  return <div className="landing-timer">{mm}:{ss}</div>
-}
-
-function useScrollReveal() {
-  useEffect(() => {
-    const els = document.querySelectorAll('[data-reveal]')
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('revealed')
-            observer.unobserve(entry.target)
-          }
-        })
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' },
-    )
-    els.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
-  }, [])
-}
-
 function MoveOverlayDemo({ demoRef }: { demoRef: RefObject<OverlayDemoHandle | null> }) {
   const nudge = (dx: number, dy: number) => demoRef.current?.nudge(dx, dy)
 
@@ -217,7 +159,6 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
   const moveDemoRef = useRef<OverlayDemoHandle>(null)
   const [installOpen, setInstallOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   useScrollReveal()
 
@@ -261,98 +202,9 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="landing-section landing-section-tint" id="how-it-works" data-reveal>
-        <div className="landing-section-header">
-          <h2>How Clarifi helps during a meeting</h2>
-        </div>
-        <div className="landing-two-col">
-          <div className="landing-feature-card blue">
-            <p className="landing-card-title">
-              Clarifi <span className="landing-pill-white">listens</span> in to the conversation
-            </p>
-            <p className="landing-card-sub">
-              It picks up the context of your meeting in real time, so it can help when you need it.
-            </p>
-            <div className="landing-recording">
-              <RecordingTimer />
-              <p className="landing-recording-label">● Recording</p>
-              <div className="landing-waveform">
-                {Array.from({ length: 24 }, (_, i) => (
-                  <span key={i} style={{ animationDelay: `${i * 0.05}s` }} />
-                ))}
-              </div>
-            </div>
-            <div className="landing-card-overlay">
-              <OverlayDemo size="sm" defaultRecording />
-            </div>
-          </div>
+      <HowItWorksSection />
 
-          <div className="landing-feature-card light">
-            <p className="landing-card-title dark">
-              When you need help, Clarifi <span className="landing-pill-muted">assists</span> you instantly
-            </p>
-            <p className="landing-card-sub dark">
-              Hit ⌘ + Enter and Clarifi helps you with AI in the moment.
-            </p>
-            <OverlayDemo size="md" showQuickPrompts defaultScreen />
-          </div>
-        </div>
-      </section>
-
-      {/* Meeting notes */}
-      <section className="landing-section" data-reveal>
-        <div className="landing-section-header centered">
-          <h2>Instant meeting notes</h2>
-          <p>The easiest way to get beautiful, shareable meeting notes.</p>
-        </div>
-        <div className="landing-notes-stack">
-          <div className="landing-notes-layer mobile">
-            <div className="landing-notes-window">
-              <p className="landing-notes-title">Design Session</p>
-              <p className="landing-notes-meta">Nov 3 · Summary</p>
-              <ul>
-                <li>Choose video label</li>
-                <li>Pick icon style</li>
-              </ul>
-            </div>
-          </div>
-          <div className="landing-notes-layer tablet">
-            <div className="landing-notes-window">
-              <p className="landing-notes-title">Creator Platform Program Design Session</p>
-              <p className="landing-notes-meta">Monday, Nov 3</p>
-              <div className="landing-notes-tabs">
-                <span className="active">Summary</span>
-                <span>Transcript</span>
-                <span>Usage</span>
-              </div>
-              <p className="landing-notes-heading">Action Items</p>
-              <ul>
-                <li>Choose final label for creator-face videos</li>
-                <li>Pick the icon style for Programs</li>
-              </ul>
-            </div>
-          </div>
-          <div className="landing-notes-layer desktop">
-            <div className="landing-notes-window">
-              <p className="landing-notes-title">Creator Platform Program Design Session</p>
-              <p className="landing-notes-meta">Monday, Nov 3</p>
-              <div className="landing-notes-tabs">
-                <span className="active">Summary</span>
-                <span>Transcript</span>
-                <span>Usage</span>
-              </div>
-              <p className="landing-notes-heading">Action Items</p>
-              <ul>
-                <li>Choose final label for creator-face videos</li>
-                <li>Pick the icon style for Programs</li>
-                <li>Decide on the default landing page layout</li>
-              </ul>
-              <div className="landing-notes-ask">Ask Clarifi about this meeting…</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ClarifiBentoSection />
 
       {/* Undetectable */}
       <section className="landing-section landing-section-tint" id="undetectable" data-reveal>
@@ -494,25 +346,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="landing-section" data-reveal>
-        <div className="landing-section-header">
-          <h2>Frequently asked questions</h2>
-        </div>
-        {FAQ_ITEMS.map((item, i) => (
-          <div key={item.q} className={`landing-faq-item ${openFaq === i ? 'open' : ''}`}>
-            <button
-              type="button"
-              className="landing-faq-trigger"
-              onClick={() => setOpenFaq(openFaq === i ? null : i)}
-            >
-              {item.q}
-              <span className="landing-faq-chevron">▼</span>
-            </button>
-            <div className="landing-faq-content">{item.a}</div>
-          </div>
-        ))}
-      </section>
+      <FaqSection />
 
       {/* Footer CTA */}
       <section className="landing-prefooter" data-reveal>

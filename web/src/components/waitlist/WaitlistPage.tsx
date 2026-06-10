@@ -2,7 +2,10 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+import { ClarifiBentoSection } from '@/components/landing/ClarifiBentoSection'
+import { FaqSection } from '@/components/landing/FaqSection'
 import { CLARIFI_INTRO_REPLY, OverlayDemo } from '@/components/landing/OverlayDemo'
+import { useScrollReveal } from '@/components/landing/useScrollReveal'
 import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
@@ -90,6 +93,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
   const scrollToJoin = useCallback(() => {
     document.getElementById('join')?.scrollIntoView({ behavior: 'smooth' })
   }, [])
+
+  useScrollReveal()
 
   useEffect(() => {
     const tick = () => setCountdown(getLaunchCountdown())
@@ -274,6 +279,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         </div>
       </section>
 
+      <ClarifiBentoSection />
+
       <WaitlistModelsSection />
 
       <WaitlistProductSections />
@@ -380,6 +387,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           </p>
         </div>
       </section>
+
+      <FaqSection className="waitlist-faq" />
 
       <WaitlistSiteFooter />
     </div>
