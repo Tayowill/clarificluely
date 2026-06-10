@@ -31,7 +31,7 @@ export const BLOG_POSTS: BlogPost[] = [
     readTime: '8 min read',
     image: '/blog/ai-meeting-assistant.png',
     imageAlt:
-      'Professional on a video call with AI meeting assistant suggestions — representing real-time copilot support during Zoom and Teams meetings',
+      'Illustration of a person overwhelmed by meeting notes and charts at a desk — representing the overload an AI meeting assistant can help solve',
     metaTitle: 'Do You Need an AI Meeting Assistant in 2026?',
     metaDescription:
       'AI meeting assistants are everywhere in 2026 — but do you need one? We compare notetakers vs real-time copilots, who they\'re for, and what to look for before you commit.',
