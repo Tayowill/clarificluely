@@ -23,6 +23,204 @@ export type BlogPost = {
 
 export const BLOG_POSTS: BlogPost[] = [
   {
+    slug: 'ai-meeting-assistant',
+    title: 'AI Meeting Assistant: Do You Actually Need One in 2026?',
+    excerpt:
+      'AI meeting assistants are everywhere — but do you need one? We compare notetakers vs real-time copilots, who they\'re for, and what to look for.',
+    date: 'June 10, 2026',
+    readTime: '8 min read',
+    image: '/blog/ai-meeting-assistant.png',
+    imageAlt:
+      'Professional on a video call with AI meeting assistant suggestions — representing real-time copilot support during Zoom and Teams meetings',
+    metaTitle: 'Do You Need an AI Meeting Assistant in 2026?',
+    metaDescription:
+      'AI meeting assistants are everywhere in 2026 — but do you need one? We compare notetakers vs real-time copilots, who they\'re for, and what to look for before you commit.',
+    blocks: [
+      {
+        type: 'p',
+        text: 'Short answer: You probably need an AI meeting assistant if your meetings affect revenue, hiring, or trust — and you want help during the call, not just a summary afterward. For low-stakes internal check-ins, you likely don\'t.',
+        strong: true,
+      },
+      {
+        type: 'p',
+        text: 'Everybody seems to have an AI meeting assistant these days. A colleague swears by theirs. A new tool launches every week. And somewhere in the back of your mind, you\'re wondering if you\'re already behind.',
+      },
+      {
+        type: 'p',
+        text: 'Before you sign up for another subscription, it\'s worth asking the obvious question: do you actually need an AI meeting assistant?',
+      },
+      {
+        type: 'p',
+        text: 'Here\'s an honest answer — no hype, no "AI will change everything" TED talk.',
+      },
+      { type: 'hr' },
+      { type: 'h2', id: 'what-is', text: 'What Is an AI Meeting Assistant?' },
+      {
+        type: 'p',
+        text: 'An AI meeting assistant is software that helps you during or after meetings on Zoom, Google Meet, Microsoft Teams, or other platforms — usually by listening to the conversation and producing transcripts, summaries, suggestions, or live answers.',
+      },
+      {
+        type: 'p',
+        text: 'Important: not all of them work the same way.',
+      },
+      {
+        type: 'table',
+        headers: ['Type', 'How it works', 'Best for', 'Limitation'],
+        rows: [
+          [
+            'AI notetaker',
+            'Often joins as a visible "bot" participant, records, transcribes, summarizes after the call',
+            'Documentation, async follow-up',
+            'Help arrives after the moment that mattered',
+          ],
+          [
+            'Real-time AI copilot',
+            'Runs on your device as a private overlay; listens locally without joining the meeting',
+            'Live sales calls, interviews, high-stakes Q&A',
+            'You still need judgment — it augments, not replaces you',
+          ],
+        ],
+      },
+      {
+        type: 'p',
+        text: 'Tools like Otter, Fireflies, and Fathom are mostly in the first bucket. Clarifi is in the second: a real-time AI meeting copilot that helps while you\'re still on the call — without a bot on the guest list and without showing up on screen share.',
+      },
+      {
+        type: 'p',
+        text: 'For the ethics side of using AI on live calls, read our post Is Using AI in Meetings Cheating? on the Clarifi blog.',
+      },
+      { type: 'h2', id: 'who-needs', text: 'Who Actually Needs an AI Meeting Assistant?' },
+      {
+        type: 'p',
+        text: 'Not everyone. If your week is mostly internal standups with nothing at stake, a shared doc is enough.',
+      },
+      {
+        type: 'p',
+        text: 'But if any of these sound familiar, an AI meeting assistant is worth serious consideration:',
+      },
+      {
+        type: 'ul',
+        items: [
+          'High-stakes calls are routine — sales demos, client presentations, investor meetings, job interviews. When answers matter, real-time support beats a recap an hour later.',
+          'You stop listening when you\'re thinking. Most people do. A real-time AI meeting tool can hold context while you stay present.',
+          'Deals die in the Q&A. You nailed the pitch; a curveball killed momentum. Live prompts help you recover in the same breath.',
+          'Post-meeting admin eats your day. Notes, CRM updates, follow-ups — an assistant that captures context live saves hours.',
+          'You want a higher floor, not just peak days. AI doesn\'t replace skill, but it reduces the gap between your best meeting and your tired-Tuesday meeting.',
+        ],
+      },
+      {
+        type: 'h2',
+        id: 'what-to-look-for',
+        text: 'What to Look for in the Best AI Meeting Assistant',
+      },
+      {
+        type: 'p',
+        text: '"Best" depends on your job. Use this checklist before you commit:',
+      },
+      { type: 'h3', text: '1. Real-time vs post-meeting' },
+      {
+        type: 'p',
+        text: 'Do you need help during the conversation or only after? Post-meeting summaries are useful; they can\'t fix a pause that already happened.',
+      },
+      { type: 'h3', text: '2. Bot vs invisible' },
+      {
+        type: 'p',
+        text: 'If the tool joins as a participant, everyone sees it — and some buyers or interviewers will care. If you need discretion, look for an undetectable AI meeting assistant that runs locally and stays off screen share.',
+      },
+      { type: 'h3', text: '3. Latency' },
+      {
+        type: 'p',
+        text: 'In a fast conversation, a three-second delay might as well be never. Test how quickly suggestions appear under pressure.',
+      },
+      { type: 'h3', text: '4. Price and limits' },
+      {
+        type: 'p',
+        text: 'Watch per-seat pricing, per-minute caps, and features that lock mid-meeting. The best AI meeting assistant for you is one you can actually use every day without hitting a wall.',
+      },
+      { type: 'h3', text: '5. Customisation' },
+      {
+        type: 'p',
+        text: 'Generic answers help generic meetings. Sales, recruiting, and consulting all need different context — battlecards, objections, product detail. Prefer tools you can tune to your world.',
+      },
+      { type: 'h2', id: 'case-for-waiting', text: 'The Honest Case for Waiting' },
+      {
+        type: 'p',
+        text: 'You might not need one yet if:',
+      },
+      {
+        type: 'ul',
+        items: [
+          'You\'re early in a role and still building foundational knowledge — lean on AI to augment, not skip learning.',
+          'Your meetings are low-stakes and predictable — ROI may not be there.',
+          'Your org forbids recording or third-party tools — check policy first.',
+        ],
+      },
+      { type: 'h2', id: 'case-for-not-waiting', text: 'The Case for Not Waiting' },
+      {
+        type: 'p',
+        text: 'Productivity tools compound. Early CRM adopters didn\'t just log a few more calls — they built better habits and data. AI meeting assistants are on a similar curve, especially real-time ones that change how conversations go, not just how they\'re documented.',
+      },
+      {
+        type: 'p',
+        text: 'The gap between people who show up with live support and people who don\'t will likely widen. Building the habit early is easier than catching up later.',
+      },
+      { type: 'h2', id: 'bottom-line', text: 'So, Do You Actually Need an AI Meeting Assistant?' },
+      {
+        type: 'p',
+        text: 'Yes, if your work includes meetings where confidence, accuracy, and speed under pressure change outcomes — sales, fundraising, hiring, client delivery, negotiations.',
+      },
+      {
+        type: 'p',
+        text: 'No, if your calls are mostly low-stakes and you\'re fine with manual notes.',
+      },
+      {
+        type: 'p',
+        text: 'Not because AI is trendy. Because the alternative is walking into important conversations with less support than you could have — for no good reason.',
+        strong: true,
+      },
+      { type: 'h2', id: 'faq', text: 'FAQ' },
+      { type: 'h3', text: 'What is an AI meeting assistant?' },
+      {
+        type: 'p',
+        text: 'Software that helps before, during, or after meetings — typically via transcription, summaries, or live suggestions on platforms like Zoom, Meet, and Teams.',
+      },
+      { type: 'h3', text: 'Is an AI meeting assistant the same as an AI notetaker?' },
+      {
+        type: 'p',
+        text: 'Often grouped together, but not the same. Notetakers focus on after the call. Real-time copilots focus on during the call.',
+      },
+      { type: 'h3', text: 'Do AI meeting assistants join Zoom as a bot?' },
+      {
+        type: 'p',
+        text: 'Many notetakers do. Desktop copilots like Clarifi are designed not to join — they listen locally so nothing extra appears on the guest list or screen share.',
+      },
+      { type: 'h3', text: 'What\'s the best AI meeting assistant for sales calls?' },
+      {
+        type: 'p',
+        text: 'Usually a real-time AI copilot for meetings that surfaces objections, talk tracks, and answers live — not just a transcript the next morning.',
+      },
+      { type: 'h3', text: 'Are AI meeting assistants worth it in 2026?' },
+      {
+        type: 'p',
+        text: 'If even one high-stakes conversation per week affects your results, yes — especially if you choose real-time help over post-meeting notes alone.',
+      },
+      {
+        type: 'p',
+        text: 'Clarifi is a real-time AI meeting copilot — invisible on screen share, built for people who can\'t afford a bad meeting.',
+      },
+      {
+        type: 'cta',
+        text: 'Launching August 24, 2026.',
+        href: '/#join',
+        label: 'Join the waitlist →',
+      },
+      {
+        type: 'p',
+        text: 'Follow updates on X @Clarifi_ai.',
+      },
+    ],
+  },
+  {
     slug: 'is-using-ai-in-meetings-cheating',
     title: "Is Using AI in Meetings Cheating? Here's the Honest Answer for Sales Reps",
     excerpt:
