@@ -109,14 +109,14 @@ function ClarifiLogoMark() {
 export function WaitlistProductSections() {
   return (
     <>
-      <section className="waitlist-benefits" aria-labelledby="why-clarifi-heading">
+      <section className="waitlist-benefits" aria-labelledby="why-clarifi-heading" data-reveal>
         <div className="waitlist-benefits-inner">
-          <h2 id="why-clarifi-heading" className="waitlist-section-heading">
+          <h2 id="why-clarifi-heading" className="waitlist-section-heading" data-reveal>
             Why Clarifi?
           </h2>
-          <div className="waitlist-benefits-grid">
+          <div className="waitlist-benefits-grid" data-reveal-group>
             {PRODUCT_BENEFITS.map((benefit) => (
-              <article key={benefit.title} className="waitlist-benefit-card">
+              <article key={benefit.title} className="waitlist-benefit-card" data-reveal>
                 <div className="waitlist-benefit-card-top">
                   <div className="waitlist-benefit-icon">{benefit.icon}</div>
                 </div>
@@ -128,14 +128,14 @@ export function WaitlistProductSections() {
         </div>
       </section>
 
-      <section className="waitlist-early" aria-labelledby="why-join-early-heading">
+      <section className="waitlist-early" aria-labelledby="why-join-early-heading" data-reveal>
         <div className="waitlist-early-inner">
-          <h2 id="why-join-early-heading" className="waitlist-section-heading">
+          <h2 id="why-join-early-heading" className="waitlist-section-heading" data-reveal>
             Why join early?
           </h2>
-          <div className="waitlist-early-row">
+          <div className="waitlist-early-row" data-reveal-group>
             {EARLY_BENEFITS.map((item) => (
-              <div key={item.num} className="waitlist-early-item">
+              <div key={item.num} className="waitlist-early-item" data-reveal>
                 <span className="waitlist-early-num">{item.num}</span>
                 <h3 className="waitlist-early-title">{item.title}</h3>
                 <p className="waitlist-early-text">{item.text}</p>
@@ -152,7 +152,7 @@ export function WaitlistSiteFooter() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <footer className="landing-footer waitlist-site-footer">
+    <footer className="landing-footer waitlist-site-footer" data-reveal>
       <div className="landing-footer-main">
         <div className="landing-footer-brand-col">
           <a href="/" className="landing-footer-logo">

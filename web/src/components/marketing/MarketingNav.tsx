@@ -56,7 +56,7 @@ export function MarketingNav({ active, showBack = false }: MarketingNavProps) {
           </span>
           Clarifi
         </Link>
-        <div className="landing-nav-links waitlist-nav-links">
+        <div className="landing-nav-links">
           <Link
             href="/blog"
             className={`landing-nav-link${active === 'blog' ? ' landing-nav-link-active' : ''}`}

@@ -3,6 +3,7 @@
 import { useRef, type RefObject } from 'react'
 import { OverlayDemo, type OverlayDemoHandle } from '@/components/landing/OverlayDemo'
 import { ScreenShareCompare } from '@/components/landing/ScreenShareCompare'
+import { MeetingParticipantsMock } from '@/components/landing/MeetingParticipantsMock'
 import { ModelExploreDemo } from './ModelExploreDemo'
 import './waitlist-page-sections.css'
 
@@ -44,25 +45,21 @@ export function WaitlistModelsSection() {
   const moveDemoRef = useRef<OverlayDemoHandle>(null)
 
   return (
-    <section className="landing-section landing-section-tint waitlist-features-section">
-      <div className="landing-section-header centered">
+    <section className="landing-section landing-section-tint waitlist-features-section" data-reveal>
+      <div className="landing-section-header centered" data-reveal>
         <h2>View some of our features</h2>
         <p>Our collection of Clarifi features for your convenience</p>
       </div>
-      <div className="landing-undetect-grid">
-        <div className="landing-undetect-feature grad-purple">
-          <div className="landing-undetect-visual">
-            <div className="landing-participants">
-              <p className="landing-participants-title">Meeting participants</p>
-              <p>Gina Huels · Todd Cremin · Holly Gleason</p>
-              <span className="landing-no-bots">✓ No bots detected</span>
-            </div>
+      <div className="landing-undetect-grid" data-reveal-group>
+        <div className="landing-undetect-feature grad-purple" data-reveal>
+          <div className="landing-undetect-visual landing-undetect-visual-participants">
+            <MeetingParticipantsMock />
           </div>
           <h3>Doesn&apos;t join meetings.</h3>
           <p>No bots. No extra people on the guest list.</p>
         </div>
 
-        <div className="landing-undetect-feature grad-pink">
+        <div className="landing-undetect-feature grad-pink" data-reveal>
           <div className="landing-undetect-visual landing-undetect-visual-compare">
             <ScreenShareCompare />
           </div>
@@ -70,7 +67,7 @@ export function WaitlistModelsSection() {
           <p>Never shows up in shared screens, recordings, or external tools.</p>
         </div>
 
-        <div className="landing-undetect-feature grad-blue">
+        <div className="landing-undetect-feature grad-blue" data-reveal>
           <div className="landing-undetect-visual landing-undetect-move">
             <MoveOverlayDemo demoRef={moveDemoRef} />
           </div>
@@ -78,7 +75,7 @@ export function WaitlistModelsSection() {
           <p>Move Clarifi anywhere on your screen — always within reach.</p>
         </div>
 
-        <div className="landing-undetect-feature grad-teal">
+        <div className="landing-undetect-feature grad-teal" data-reveal>
           <div className="landing-undetect-visual landing-undetect-visual-models">
             <ModelExploreDemo />
           </div>

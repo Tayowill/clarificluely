@@ -8,6 +8,7 @@ import {
   SITE_OG_IMAGE,
   SITE_TITLE,
 } from '@/lib/site-metadata'
+import { ScrollRevealInit } from '@/components/landing/ScrollRevealInit'
 import { getSiteOrigin } from '@/lib/site-url'
 import './globals.css'
 
@@ -58,6 +59,7 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <body className="font-sans antialiased">
         {children}
+        <ScrollRevealInit />
         <Analytics />
       </body>
     </html>

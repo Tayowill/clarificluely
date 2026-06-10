@@ -20,22 +20,20 @@
   background: transparent;
 }
 
-.waitlist-nav-links {
-  flex: 1;
-  justify-content: center;
+.waitlist-page .landing-section {
+  background: transparent;
+}
+
+.waitlist-page .landing-section-tint {
+  background: transparent;
 }
 
 .waitlist-benefits {
   position: relative;
-  margin-top: -3rem;
-  padding: 6rem 1.5rem 5rem;
-  background:
-    linear-gradient(180deg, transparent 0%, hsl(250 40% 90% / 0.28) 10%),
-    linear-gradient(var(--cl-frost-veil), var(--cl-frost-veil)),
-    radial-gradient(ellipse 85% 65% at 0% 15%, hsl(250 43% 87% / 0.42) 0%, transparent 58%),
-    radial-gradient(ellipse 72% 60% at 100% 88%, hsl(350 42% 87% / 0.38) 0%, transparent 55%),
-    linear-gradient(180deg, transparent 0%, var(--cl-lavender-soft) 100%);
-  overflow: hidden;
+  margin-top: -1.5rem;
+  padding: 6.5rem 1.5rem 5rem;
+  background: transparent;
+  overflow: visible;
 }
 
 .waitlist-benefits::before,
@@ -49,19 +47,19 @@
 }
 
 .waitlist-benefits::before {
-  width: 420px;
-  height: 420px;
-  background: hsl(250 50% 78% / 0.42);
-  top: 10%;
-  left: -8%;
+  width: 520px;
+  height: 520px;
+  background: hsl(250 50% 78% / 0.22);
+  top: -18%;
+  left: -10%;
 }
 
 .waitlist-benefits::after {
-  width: 380px;
-  height: 380px;
-  background: hsl(350 45% 84% / 0.38);
-  bottom: 5%;
-  right: -6%;
+  width: 460px;
+  height: 460px;
+  background: hsl(350 45% 84% / 0.18);
+  bottom: -8%;
+  right: -8%;
 }
 
 .waitlist-benefits-inner,
@@ -168,12 +166,7 @@
 
 .waitlist-early {
   padding: 5rem 1.5rem;
-  background: linear-gradient(
-    180deg,
-    var(--cl-lavender-soft) 0%,
-    hsl(0, 0%, 99.5%) 28%,
-    hsl(0, 0%, 99.5%) 100%
-  );
+  background: transparent;
 }
 
 .waitlist-early-row {
@@ -211,7 +204,7 @@
 }
 
 .waitlist-site-footer {
-  background: linear-gradient(180deg, hsl(0, 0%, 99.5%) 0%, #e8eaf0 100%);
+  background: linear-gradient(180deg, transparent 0%, hsl(228 15% 92% / 0.45) 55%, #e8eaf0 100%);
 }
 
 .waitlist-site-footer .landing-footer-logo-text {
@@ -297,8 +290,15 @@
 
 /* ── Features grid (prelaunch) ── */
 .waitlist-features-section {
-  padding-top: 4rem;
-  padding-bottom: 4rem;
+  position: relative;
+  padding-top: 4.5rem;
+  padding-bottom: 4.5rem;
+  background: transparent;
+}
+
+.waitlist-features-section > * {
+  position: relative;
+  z-index: 1;
 }
 
 .waitlist-features-section .landing-undetect-grid {

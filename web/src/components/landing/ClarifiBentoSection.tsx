@@ -76,69 +76,26 @@ function AskClarifiScreen() {
   )
 }
 
-function DockMock() {
+function RecordMeetingsCard() {
   return (
-    <div className="bento-dock-scene">
-      <MenuBarMock />
-      <div className="bento-dock-desktop" />
-      <div className="bento-dock-bar">
-        {['Finder', 'Safari', 'Zoom', 'Clarifi', 'Slack'].map((app) => (
-          <div
-            key={app}
-            className={`bento-dock-icon${app === 'Clarifi' ? ' highlight' : ''}`}
-            title={app}
-          >
-            {app === 'Clarifi' ? (
-              <Image src="/clarifi-logo.png" alt="" width={28} height={28} />
-            ) : (
-              <span>{app.slice(0, 1)}</span>
-            )}
-          </div>
-        ))}
+    <article className="clarifi-bento-card clarifi-bento-record bento-apple-card" data-reveal>
+      <div className="bento-apple-card-visual">
+        <Image
+          src="/bento-record-macbook.jpg"
+          alt=""
+          fill
+          className="bento-record-macbook-img"
+          sizes="(max-width: 768px) 100vw, 420px"
+        />
       </div>
-    </div>
-  )
-}
-
-function RecapScreen() {
-  return (
-    <div className="bento-recap-screen">
-      <div className="bento-recap-window">
-        <p className="landing-notes-meta">Monday, Nov 3 · Roy, Alexa, +2</p>
-        <p className="landing-notes-title">Strategic Sales Growth Session</p>
-        <div className="landing-notes-tabs">
-          <span className="active">Summary</span>
-          <span>Transcript</span>
-          <span>Suggestions</span>
-        </div>
-        <p className="landing-notes-heading">Overview</p>
-        <p className="bento-recap-overview">
-          The team aligned on a Q1 pilot, discussed CRM integration, and agreed on next steps
-          for procurement.
+      <div className="bento-apple-card-copy">
+        <h3>Record meetings without a bot in the room</h3>
+        <p>
+          Your meetings stay completely normal. Just hit record on your desktop and let Clarifi
+          handle the rest.
         </p>
-        <p className="landing-notes-heading">Action items</p>
-        <ul className="bento-checklist">
-          <li>
-            <span className="bento-check" aria-hidden>
-              ✓
-            </span>
-            Send pilot timeline one-pager
-          </li>
-          <li>
-            <span className="bento-check" aria-hidden>
-              ✓
-            </span>
-            Confirm budget owner before Friday
-          </li>
-          <li>
-            <span className="bento-check" aria-hidden>
-              ✓
-            </span>
-            Draft follow-up email for the team
-          </li>
-        </ul>
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -170,10 +127,11 @@ function LiveTranscriptMock() {
       </div>
       <div className="bento-live-bar">
         <span className="bento-live-timer">00:14</span>
-        <div className="landing-waveform bento-live-wave">
-          {Array.from({ length: 16 }, (_, i) => (
-            <span key={i} style={{ animationDelay: `${i * 0.06}s` }} />
-          ))}
+        <div className="bento-live-waveform active">
+          <span />
+          <span />
+          <span />
+          <span />
         </div>
         <span className="bento-live-pause">⏸</span>
         <span className="bento-live-stop">●</span>
@@ -231,29 +189,26 @@ export function ClarifiBentoSection() {
         </div>
 
         <div className="clarifi-bento-side">
-          <article className="clarifi-bento-card clarifi-bento-record" data-reveal>
-            <div className="bento-record-visual">
-              <MacBookMock size="md">
-                <DockMock />
-              </MacBookMock>
-            </div>
-            <h3>A Mac app that never joins your meetings</h3>
-            <p>
-              Record any conversation from your desktop — Zoom, Meet, Teams, or local audio —
-              without bots on the guest list.
-            </p>
-          </article>
+          <RecordMeetingsCard />
 
           <article className="clarifi-bento-card clarifi-bento-recap" data-reveal>
-            <h3>Instant recaps you can trust</h3>
-            <p>
-              Clarifi turns every session into a clear summary with decisions, action items, and
-              a follow-up draft.
-            </p>
-            <div className="bento-recap-visual grad-recap">
-              <MacBookMock size="md">
-                <RecapScreen />
-              </MacBookMock>
+            <div className="bento-recap-otter">
+              <div className="bento-recap-otter-header">
+                <h3>Instant recaps you can trust</h3>
+                <p>
+                  Clarifi turns every session into a clear summary with decisions, action items,
+                  and a follow-up draft.
+                </p>
+              </div>
+              <div className="bento-recap-otter-shot">
+                <Image
+                  src="/bento-recap-summary.png"
+                  alt=""
+                  width={1024}
+                  height={1013}
+                  className="bento-recap-summary-img"
+                />
+              </div>
             </div>
           </article>
         </div>

@@ -55,7 +55,7 @@ export function PricingPage() {
           </p>
         )}
 
-        <section className="pricing-hero">
+        <section className="pricing-hero" data-reveal>
           <h1 className="pricing-hero-title">Start for free.</h1>
           <p className="pricing-hero-sub">
             Get instant access to Clarifi and upgrade every conversation. Unlock Clarifi for your
@@ -88,7 +88,7 @@ export function PricingPage() {
         </section>
 
         {device === 'mobile' ? (
-          <section className="pricing-mobile-soon">
+          <section className="pricing-mobile-soon" data-reveal>
             <p>Clarifi for mobile is coming soon.</p>
             <Link href="/#join" className="landing-cta">
               Join the waitlist
@@ -96,11 +96,12 @@ export function PricingPage() {
           </section>
         ) : (
           <>
-            <section className="pricing-cards">
+            <section className="pricing-cards" data-reveal-group>
               {plans.map((plan) => (
                 <article
                   key={plan.id}
                   className={`pricing-card${plan.id === 'pro_plus' ? ' pricing-card-featured' : ''}`}
+                  data-reveal
                 >
                   <div className="pricing-card-head">
                     <h2 className="pricing-card-name">
@@ -146,7 +147,7 @@ export function PricingPage() {
               ))}
             </section>
 
-            <section className="pricing-compare">
+            <section className="pricing-compare" data-reveal>
               <h2 className="pricing-compare-title">Features</h2>
               <div className="pricing-compare-grid">
                 <div className="pricing-compare-header">

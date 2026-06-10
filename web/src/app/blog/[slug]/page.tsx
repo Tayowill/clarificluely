@@ -85,7 +85,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     <div className="blog-root">
       <FaqJsonLd slug={slug} />
       <MarketingNav active="blog" showBack />
-      <article className="blog-post">
+      <article className="blog-post" data-reveal>
         <h1>{post.title}</h1>
         <p className="blog-post-meta">
           {post.date} · {post.readTime}

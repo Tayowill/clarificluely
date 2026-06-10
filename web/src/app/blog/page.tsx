@@ -16,14 +16,14 @@ export default function BlogPage() {
     <div className="blog-root">
       <MarketingNav active="blog" showBack />
 
-      <header className="blog-header">
+      <header className="blog-header" data-reveal>
         <h1>Blog</h1>
         <p>Product updates, meeting tips, and how to get the most from Clarifi.</p>
       </header>
 
-      <div className="blog-grid">
+      <div className="blog-grid" data-reveal-group>
         {BLOG_POSTS.map((post) => (
-          <article key={post.slug} className="blog-card blog-card-featured">
+          <article key={post.slug} className="blog-card blog-card-featured" data-reveal>
             <Link href={`/blog/${post.slug}`} className="blog-card-image-link">
               <Image
                 src={post.image}
@@ -47,7 +47,7 @@ export default function BlogPage() {
         ))}
       </div>
 
-      <footer className="blog-footer">
+      <footer className="blog-footer" data-reveal>
         <p style={{ color: 'rgba(255,255,255,0.45)', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
           AI that helps you, invisibly.
         </p>

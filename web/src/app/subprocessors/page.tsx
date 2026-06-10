@@ -15,7 +15,7 @@ export default function SubprocessorsPage() {
       <MarketingNav showBack />
 
       <div className="legal-layout legal-layout-single">
-        <main className="legal-main">
+        <main className="legal-main" data-reveal>
           <h1>Clarifi Subprocessors</h1>
           <p className="legal-updated">Current as of 8 June 2026</p>
 

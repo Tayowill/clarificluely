@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { ClarifiBentoSection } from '@/components/landing/ClarifiBentoSection'
 import { FaqSection } from '@/components/landing/FaqSection'
 import { CLARIFI_INTRO_REPLY, OverlayDemo } from '@/components/landing/OverlayDemo'
-import { useScrollReveal } from '@/components/landing/useScrollReveal'
 import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
@@ -93,8 +92,6 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
   const scrollToJoin = useCallback(() => {
     document.getElementById('join')?.scrollIntoView({ behavior: 'smooth' })
   }, [])
-
-  useScrollReveal()
 
   useEffect(() => {
     const tick = () => setCountdown(getLaunchCountdown())
@@ -253,7 +250,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
       <section className="landing-hero">
         <div className="landing-hero-glow landing-hero-glow-a" aria-hidden />
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
-        <div className="landing-hero-content waitlist-hero-content">
+        <div className="landing-hero-content waitlist-hero-content" data-reveal>
           <h1 className="waitlist-hero-title">
             The Undetectable AI Co-Pilot for{' '}
             <span className="waitlist-hero-title-accent">Every Virtual Meeting</span>.
@@ -265,7 +262,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           <JoinWaitlistButton onClick={scrollToJoin} large />
         </div>
 
-        <div className="landing-hero-widget-wrap">
+        <div className="landing-hero-widget-wrap" data-reveal>
           <OverlayDemo
             size="lg"
             showQuickPrompts
@@ -285,7 +282,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
 
       <WaitlistProductSections />
 
-      <section className="waitlist-join" id="join">
+      <section className="waitlist-join" id="join" data-reveal>
         <div className="waitlist-join-inner">
           <p className="waitlist-eyebrow">Launching soon</p>
 

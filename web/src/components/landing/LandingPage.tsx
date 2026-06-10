@@ -9,8 +9,8 @@ import { HowItWorksSection } from './HowItWorksSection'
 import { ClarifiBentoSection } from './ClarifiBentoSection'
 import { FaqSection } from './FaqSection'
 import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
+import { MeetingParticipantsMock } from './MeetingParticipantsMock'
 import { ScreenShareCompare } from './ScreenShareCompare'
-import { useScrollReveal } from './useScrollReveal'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
 import '@/components/waitlist/waitlist.css'
 import './landing.css'
@@ -160,8 +160,6 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
   const [installOpen, setInstallOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  useScrollReveal()
-
   const triggerDownload = useCallback(() => {
     const a = document.createElement('a')
     a.href = macDownloadUrl
@@ -184,7 +182,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
       <section className="landing-hero">
         <div className="landing-hero-glow landing-hero-glow-a" aria-hidden />
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
-        <div className="landing-hero-content">
+        <div className="landing-hero-content" data-reveal>
           <h1 className="waitlist-hero-title">
             F*ck Cluely.{' '}
             <span className="waitlist-hero-title-sub">
@@ -197,7 +195,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
           <JoinWaitlistButton onClick={joinWaitlist} large />
         </div>
 
-        <div className="landing-hero-widget-wrap">
+        <div className="landing-hero-widget-wrap" data-reveal>
           <OverlayDemo size="lg" showQuickPrompts defaultScreen />
         </div>
       </section>
@@ -214,12 +212,8 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
         </div>
         <div className="landing-undetect-grid">
           <div className="landing-undetect-feature grad-purple">
-            <div className="landing-undetect-visual">
-              <div className="landing-participants">
-                <p className="landing-participants-title">Meeting participants</p>
-                <p>Gina Huels · Todd Cremin · Holly Gleason</p>
-                <span className="landing-no-bots">✓ No bots detected</span>
-              </div>
+            <div className="landing-undetect-visual landing-undetect-visual-participants">
+              <MeetingParticipantsMock />
             </div>
             <h3>Doesn&apos;t join meetings.</h3>
             <p>No bots. No extra people on the guest list.</p>

@@ -34,7 +34,7 @@ export default function PrivacyPolicyPage() {
       <MarketingNav showBack />
 
       <div className="legal-layout">
-        <main className="legal-main">
+        <main className="legal-main" data-reveal>
           <h1>Privacy Policy</h1>
           <p className="legal-updated">Last updated on 8 June 2026</p>
 
