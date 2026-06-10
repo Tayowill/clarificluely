@@ -45,14 +45,9 @@ export type OverlayDemoProps = {
   demoRef?: Ref<OverlayDemoHandle>
   initialMessages?: ChatMessage[]
   defaultPanelMode?: PanelMode
-  demoModel?: string
-  demoMode?: string
+  defaultModelLabel?: string
+  defaultModeLabel?: string
 }
-
-const DEMO_SESSIONS = [
-  { title: 'Sales discovery call', duration: '24 min' },
-  { title: 'Weekly team standup', duration: '12 min' },
-]
 
 const DEMO_TRANSCRIPT = [
   'Them · Can you walk us through the rollout timeline?',
@@ -204,13 +199,15 @@ export function OverlayDemo({
   demoRef,
   initialMessages = [],
   defaultPanelMode = 'bar',
-  demoModel = 'Fable 5',
-  demoMode = 'General',
+  defaultModelLabel = 'Fable 5',
+  defaultModeLabel = 'General',
 }: OverlayDemoProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  const modelMenuRef = useRef<HTMLDivElement>(null)
 
   const [panelMode, setPanelMode] = useState<PanelMode>(defaultPanelMode)
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages)
   const [thinking, setThinking] = useState(false)
@@ -224,6 +221,17 @@ export function OverlayDemo({
 
   const hasChat = messages.length > 0
   const canInteract = interactive
+
+  useEffect(() => {
+    if (!modelMenuOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!modelMenuRef.current?.contains(e.target as Node)) {
+        setModelMenuOpen(false)
+      }
+    }
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [modelMenuOpen])
 
   useEffect(() => {
     if (!isRecording) {
@@ -325,13 +333,13 @@ export function OverlayDemo({
     screenOn ? 'Ask anything about your screen' : hasChat ? 'Ask follow-up' : 'Ask me anything'
 
   const toggleSessions = () => {
-    if (!canInteract) return
     setPanelMode((m) => (m === 'sessions' ? 'bar' : 'sessions'))
+    setModelMenuOpen(false)
   }
 
   const toggleHistory = () => {
-    if (!canInteract) return
     setPanelMode((m) => (m === 'history' ? 'bar' : 'history'))
+    setModelMenuOpen(false)
   }
 
   const renderToolbar = () => (
@@ -340,14 +348,35 @@ export function OverlayDemo({
         <div className={`od-dot ${isRecording ? 'recording' : ''}`} />
         <span className="od-brand">Clarifi</span>
 
-        <button type="button" className="od-pill" disabled={!canInteract} aria-label="Model">
-          <span className="od-pill-label">{demoModel}</span>
-          <span className="od-chevron">▼</span>
-        </button>
+        <div className="od-pill-wrap" ref={modelMenuRef}>
+          <button
+            type="button"
+            className={`od-pill ${modelMenuOpen ? 'active' : ''}`}
+            onClick={() => canInteract && setModelMenuOpen((v) => !v)}
+            disabled={!canInteract}
+            aria-expanded={modelMenuOpen}
+          >
+            <span className="od-pill-label">{defaultModelLabel}</span>
+            <span className="od-pill-chevron">▼</span>
+          </button>
+          {modelMenuOpen && (
+            <div className="od-model-menu">
+              <button
+                type="button"
+                className="od-model-item"
+                onClick={() => setModelMenuOpen(false)}
+              >
+                All models
+              </button>
+            </div>
+          )}
+        </div>
 
-        <button type="button" className="od-pill od-mode-pill" disabled={!canInteract} aria-label="Mode">
-          <span className="od-pill-label">{demoMode}</span>
-        </button>
+        <ToolbarTip label="Change mode & system prompt">
+          <button type="button" className="od-pill od-mode-pill" disabled={!canInteract}>
+            <span className="od-pill-label">{defaultModeLabel}</span>
+          </button>
+        </ToolbarTip>
 
         <ToolbarTip label="Uses Screen">
           <button
@@ -406,17 +435,11 @@ export function OverlayDemo({
           </button>
         </ToolbarTip>
 
-        {hasChat && panelMode === 'bar' && (
-          <button type="button" className="od-new-chat-btn" onClick={() => setPanelMode('chat')}>
-            New Chat
-          </button>
-        )}
-
         <ToolbarTip label="Audio sessions">
           <button
             type="button"
             className={`od-history-btn ${panelMode === 'sessions' ? 'active' : ''}`}
-            onClick={toggleSessions}
+            onClick={() => canInteract && toggleSessions()}
             disabled={!canInteract}
             aria-expanded={panelMode === 'sessions'}
           >
@@ -429,7 +452,7 @@ export function OverlayDemo({
           <button
             type="button"
             className={`od-history-btn ${panelMode === 'history' ? 'active' : ''}`}
-            onClick={toggleHistory}
+            onClick={() => canInteract && toggleHistory()}
             disabled={!canInteract}
             aria-expanded={panelMode === 'history'}
           >
@@ -493,7 +516,7 @@ export function OverlayDemo({
                   </div>
                 ) : (
                   <div key={i} className="od-assistant-block">
-                    {msg.usedScreen && <div className="od-viewed-label">Viewed screen</div>}
+                    {msg.usedScreen && <div className="od-viewed-label">Viewed Screen</div>}
                     <div className="od-assistant-content">{renderSimpleMarkdown(msg.content)}</div>
                   </div>
                 ),
@@ -543,18 +566,18 @@ export function OverlayDemo({
 
         {panelMode === 'sessions' && (
           <div className="od-expanded">
-            <div className="od-expanded-label">Recent sessions</div>
-            {DEMO_SESSIONS.map((session) => (
-              <div key={session.title} className="od-session-row">
-                <span className="od-session-title">{session.title}</span>
-                <span className="od-session-duration">{session.duration}</span>
-              </div>
-            ))}
+            <div className="od-expanded-label">Audio sessions</div>
+            <div className="od-session-row">Product demo · 12 min</div>
+            <div className="od-session-row">Weekly sync · 34 min</div>
+            <div className="od-session-row muted">No active session</div>
+          </div>
+        )}
+
+        {panelMode === 'history' && (
+          <div className="od-expanded">
             {isRecording && transcriptLines.length > 0 && (
               <>
-                <div className="od-expanded-label" style={{ marginTop: 12 }}>
-                  Live transcript
-                </div>
+                <div className="od-expanded-label">Transcript</div>
                 {transcriptLines.map((line, i) => (
                   <div key={i} className="od-transcript-line">
                     {line}
@@ -562,12 +585,9 @@ export function OverlayDemo({
                 ))}
               </>
             )}
-          </div>
-        )}
-
-        {panelMode === 'history' && (
-          <div className="od-expanded">
-            <div className="od-expanded-label">Suggestions</div>
+            <div className="od-expanded-label" style={{ marginTop: isRecording ? 12 : 0 }}>
+              Suggestions
+            </div>
             {DEMO_SUGGESTIONS.map((s, i) => (
               <button
                 key={i}

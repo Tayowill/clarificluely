@@ -294,3 +294,226 @@
     padding: 4rem 1.25rem;
   }
 }
+
+/* ── Features grid (prelaunch) ── */
+.waitlist-features-section {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.waitlist-features-section .landing-undetect-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.waitlist-features-section .landing-undetect-feature {
+  min-width: 0;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.waitlist-features-section .landing-undetect-visual {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.waitlist-features-section .landing-undetect-visual-compare {
+  min-height: 0;
+  padding: 0.65rem;
+}
+
+.waitlist-features-section .ssc-root {
+  height: 100%;
+}
+
+.waitlist-features-section .ssc-scene {
+  height: 100%;
+  min-height: 0;
+}
+
+.waitlist-features-section .landing-undetect-feature h3,
+.waitlist-features-section .landing-undetect-feature p {
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .waitlist-features-section .landing-undetect-feature {
+    max-width: 520px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.waitlist-features-section .landing-undetect-feature.grad-teal {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 55%, #5eead4 100%);
+}
+
+.waitlist-features-section .landing-undetect-visual-models {
+  min-height: 0;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.model-explore-demo {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: #f8fafc;
+  text-align: left;
+}
+
+.model-explore-demo-header {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.model-explore-demo-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.model-explore-demo-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.model-explore-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.model-explore-scroll:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.65);
+  outline-offset: -2px;
+}
+
+.model-explore-provider {
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.model-explore-provider-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.model-explore-provider-chevron {
+  font-size: 9px;
+  opacity: 0.55;
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.model-explore-provider-meta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.model-explore-provider-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.model-explore-provider-body {
+  padding: 0 6px 6px;
+}
+
+.model-explore-divider {
+  height: 1px;
+  margin: 4px 4px 6px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.model-explore-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.model-explore-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.model-explore-row.active {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.model-explore-row-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-explore-row-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.model-explore-row-id {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-explore-row-pill {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.model-explore-row-pill.active {
+  background: #22c55e;
+  color: #fff;
+}

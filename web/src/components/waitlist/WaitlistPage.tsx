@@ -12,6 +12,7 @@ import { authCallbackUrl } from '@/lib/site-url'
 import '@/components/landing/landing.css'
 import './waitlist.css'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
+import { WaitlistModelsSection } from './WaitlistModelsSection'
 import { WaitlistProductSections, WaitlistSiteFooter } from './WaitlistPageSections'
 
 function GoogleIcon() {
@@ -272,6 +273,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           />
         </div>
       </section>
+
+      <WaitlistModelsSection />
 
       <WaitlistProductSections />
 
