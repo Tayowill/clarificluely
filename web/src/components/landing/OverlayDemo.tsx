@@ -12,7 +12,7 @@ import {
 } from 'react'
 import './overlay-demo.css'
 
-type PanelMode = 'bar' | 'chat' | 'history'
+type PanelMode = 'bar' | 'chat' | 'history' | 'sessions'
 type DemoSize = 'sm' | 'md' | 'lg'
 
 type ChatMessage = {
@@ -45,7 +45,14 @@ export type OverlayDemoProps = {
   demoRef?: Ref<OverlayDemoHandle>
   initialMessages?: ChatMessage[]
   defaultPanelMode?: PanelMode
+  demoModel?: string
+  demoMode?: string
 }
+
+const DEMO_SESSIONS = [
+  { title: 'Sales discovery call', duration: '24 min' },
+  { title: 'Weekly team standup', duration: '12 min' },
+]
 
 const DEMO_TRANSCRIPT = [
   'Them · Can you walk us through the rollout timeline?',
@@ -197,6 +204,8 @@ export function OverlayDemo({
   demoRef,
   initialMessages = [],
   defaultPanelMode = 'bar',
+  demoModel = 'Fable 5',
+  demoMode = 'General',
 }: OverlayDemoProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
@@ -315,11 +324,30 @@ export function OverlayDemo({
   const placeholder =
     screenOn ? 'Ask anything about your screen' : hasChat ? 'Ask follow-up' : 'Ask me anything'
 
+  const toggleSessions = () => {
+    if (!canInteract) return
+    setPanelMode((m) => (m === 'sessions' ? 'bar' : 'sessions'))
+  }
+
+  const toggleHistory = () => {
+    if (!canInteract) return
+    setPanelMode((m) => (m === 'history' ? 'bar' : 'history'))
+  }
+
   const renderToolbar = () => (
     <div className="od-toolbar">
       <div className="od-toolbar-left">
         <div className={`od-dot ${isRecording ? 'recording' : ''}`} />
         <span className="od-brand">Clarifi</span>
+
+        <button type="button" className="od-pill" disabled={!canInteract} aria-label="Model">
+          <span className="od-pill-label">{demoModel}</span>
+          <span className="od-chevron">▼</span>
+        </button>
+
+        <button type="button" className="od-pill od-mode-pill" disabled={!canInteract} aria-label="Mode">
+          <span className="od-pill-label">{demoMode}</span>
+        </button>
 
         <ToolbarTip label="Uses Screen">
           <button
@@ -379,22 +407,29 @@ export function OverlayDemo({
         </ToolbarTip>
 
         {hasChat && panelMode === 'bar' && (
-          <button
-            type="button"
-            className="od-history-btn"
-            onClick={() => setPanelMode('chat')}
-          >
-            Open chat
+          <button type="button" className="od-new-chat-btn" onClick={() => setPanelMode('chat')}>
+            New Chat
           </button>
         )}
+
+        <ToolbarTip label="Audio sessions">
+          <button
+            type="button"
+            className={`od-history-btn ${panelMode === 'sessions' ? 'active' : ''}`}
+            onClick={toggleSessions}
+            disabled={!canInteract}
+            aria-expanded={panelMode === 'sessions'}
+          >
+            <span>Sessions</span>
+            <span className={`od-chevron ${panelMode === 'sessions' ? 'up' : ''}`}>▼</span>
+          </button>
+        </ToolbarTip>
 
         <ToolbarTip label="History">
           <button
             type="button"
             className={`od-history-btn ${panelMode === 'history' ? 'active' : ''}`}
-            onClick={() =>
-              canInteract && setPanelMode((m) => (m === 'history' ? 'bar' : 'history'))
-            }
+            onClick={toggleHistory}
             disabled={!canInteract}
             aria-expanded={panelMode === 'history'}
           >
@@ -506,11 +541,20 @@ export function OverlayDemo({
           {renderToolbar()}
         </div>
 
-        {panelMode === 'history' && (
+        {panelMode === 'sessions' && (
           <div className="od-expanded">
+            <div className="od-expanded-label">Recent sessions</div>
+            {DEMO_SESSIONS.map((session) => (
+              <div key={session.title} className="od-session-row">
+                <span className="od-session-title">{session.title}</span>
+                <span className="od-session-duration">{session.duration}</span>
+              </div>
+            ))}
             {isRecording && transcriptLines.length > 0 && (
               <>
-                <div className="od-expanded-label">Transcript</div>
+                <div className="od-expanded-label" style={{ marginTop: 12 }}>
+                  Live transcript
+                </div>
                 {transcriptLines.map((line, i) => (
                   <div key={i} className="od-transcript-line">
                     {line}
@@ -518,9 +562,12 @@ export function OverlayDemo({
                 ))}
               </>
             )}
-            <div className="od-expanded-label" style={{ marginTop: isRecording ? 12 : 0 }}>
-              Suggestions
-            </div>
+          </div>
+        )}
+
+        {panelMode === 'history' && (
+          <div className="od-expanded">
+            <div className="od-expanded-label">Suggestions</div>
             {DEMO_SUGGESTIONS.map((s, i) => (
               <button
                 key={i}
