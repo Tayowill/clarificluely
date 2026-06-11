@@ -373,6 +373,33 @@
   overflow: hidden;
 }
 
+.waitlist-features-section .landing-undetect-visual-participants {
+  min-height: 0;
+  padding: 0;
+  background: #0f0f10;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.waitlist-features-section .participants-feature-row {
+  padding: 2px 5px;
+  gap: 6px;
+}
+
+.waitlist-features-section .participants-feature-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 0.54rem;
+}
+
+.waitlist-features-section .participants-feature-name {
+  font-size: 0.6rem;
+}
+
+.waitlist-features-section .participants-feature-sub {
+  font-size: 0.52rem;
+}
+
 .model-explore-demo {
   display: flex;
   flex-direction: column;
