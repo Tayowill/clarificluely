@@ -54,7 +54,13 @@ hdiutil attach -nobrowse -quiet "$DMG" -mountpoint "$MOUNT"
 spctl -a -vv -t install "$MOUNT/Clarifi.app" || true
 hdiutil detach "$MOUNT" -quiet 2>/dev/null || true
 
+echo "Verifying distributable DMG..."
+DEBUG_RUN_ID="${DEBUG_RUN_ID:-release}" node scripts/verify-mac-dmg.mjs "$DMG"
+
 WEB_DMG="$ROOT/web/public/downloads/Clarifi-0.1.0-arm64.dmg"
-mkdir -p "$(dirname "$WEB_DMG")"
+REPO_WEB_DMG="$(cd "$ROOT/.." && pwd)/web/public/downloads/Clarifi-0.1.0-arm64.dmg"
+mkdir -p "$(dirname "$WEB_DMG")" "$(dirname "$REPO_WEB_DMG")"
 cp "$DMG" "$WEB_DMG"
+cp "$DMG" "$REPO_WEB_DMG"
 echo "Published to $WEB_DMG ($(du -h "$WEB_DMG" | cut -f1))"
+echo "Published to $REPO_WEB_DMG ($(du -h "$REPO_WEB_DMG" | cut -f1))"

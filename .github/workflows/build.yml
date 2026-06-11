@@ -12,7 +12,6 @@ on:
 env:
   NODE_VERSION: 20
   SKIP_NATIVE_REBUILD: '1'
-  SKIP_NOTARIZE: '1'
 
 jobs:
   build-mac:
@@ -61,6 +60,7 @@ jobs:
         run: npm run build:mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          SKIP_NOTARIZE: '1'
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
