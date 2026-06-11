@@ -56,7 +56,7 @@ export function ModelExploreDemo() {
           Scroll to browse · tap to preview
         </span>
       </div>
-      <div className="model-explore-scroll" tabIndex={0} aria-label="Built-in AI models">
+      <div className="model-explore-scroll" aria-label="Built-in AI models">
         {PROVIDER_ORDER.map((provider) => {
           const models = groups.get(provider) ?? []
           if (models.length === 0) return null

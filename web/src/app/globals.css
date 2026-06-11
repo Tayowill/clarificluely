@@ -25,49 +25,55 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Scroll reveal — site-wide (SSR-safe: visible until JS enables animations) */
-html:not(.js-reveal-ready) [data-reveal] {
+/* Scroll reveal — visible until React enables animations (no hydration mismatch) */
+[data-reveal] {
   opacity: 1;
   transform: none;
-  transition: none;
 }
 
-html.js-reveal-ready [data-reveal]:not([data-revealed]) {
+[data-reveal-root] [data-reveal]:not([data-revealed]) {
   opacity: 0;
-  transform: translateY(28px);
-  transition:
-    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html.js-reveal-ready [data-reveal][data-revealed] {
+[data-reveal-root] [data-reveal][data-revealed] {
   opacity: 1;
-  transform: translateY(0);
-  transition:
-    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal-root] [data-reveal] {
+    opacity: 1 !important;
+    transition: none !important;
+  }
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(1) {
+  animation-delay: 0s;
   transition-delay: 0s;
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(2) {
+  animation-delay: 0.08s;
   transition-delay: 0.08s;
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(3) {
+  animation-delay: 0.16s;
   transition-delay: 0.16s;
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(4) {
+  animation-delay: 0.24s;
   transition-delay: 0.24s;
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(5) {
+  animation-delay: 0.32s;
   transition-delay: 0.32s;
 }
 
 [data-reveal-group] > [data-reveal]:nth-child(6) {
+  animation-delay: 0.4s;
   transition-delay: 0.4s;
 }
