@@ -3,8 +3,9 @@ import Link from 'next/link'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { DesktopConnect } from '@/components/DesktopConnect'
 import { getServerUser } from '@/lib/auth-server'
-import { getMacDownloadUrl } from '@/lib/downloads'
+import { getMacDownloadUrl, MAC_DMG_FILENAME } from '@/lib/downloads'
 import { PLAN_LIMITS } from '@/lib/plans'
+import { shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
 import { getUsageStats } from '@/lib/usage'
 
 export const metadata = {
@@ -15,6 +16,7 @@ export const metadata = {
 export default async function DashboardPage() {
   const user = await getServerUser()
   if (!user) redirect('/sign-in?next=/dashboard')
+  if (shouldBlockPrelaunchAccess('/dashboard', user.id)) redirect('/?joined=1')
 
   const stats = await getUsageStats(user.id)
   const limitLabel = Number.isFinite(stats.limit)
@@ -56,11 +58,12 @@ export default async function DashboardPage() {
           <h2 className="font-semibold mb-1">Download Clarifi</h2>
           <p className="text-sm text-white/50 mb-4">
             Install the desktop app, then use Open Clarifi Desktop above to connect automatically.
+            On first launch, right-click Clarifi in Applications and choose Open, then confirm Open in the security dialog.
           </p>
           <div className="flex flex-wrap gap-3">
             <a
               href={macDownloadUrl}
-              download
+              download={MAC_DMG_FILENAME}
               className="inline-block bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/90"
             >
               Download for macOS

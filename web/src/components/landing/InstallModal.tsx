@@ -61,22 +61,9 @@ export function InstallModal({ open, onClose, onDownloadAgain }: InstallModalPro
             color: '#374151',
           }}
         >
-          <strong>Seeing &ldquo;app is damaged&rdquo;?</strong> This preview build is not Apple-notarized yet.
-          After dragging Clarifi into Applications, open <strong>Terminal</strong> and run:
-          <code
-            style={{
-              display: 'block',
-              marginTop: '0.5rem',
-              padding: '0.55rem 0.65rem',
-              borderRadius: '0.5rem',
-              background: '#111827',
-              color: '#f9fafb',
-              fontSize: '0.8rem',
-            }}
-          >
-            xattr -cr /Applications/Clarifi.app
-          </code>
-          Then <strong>right-click Clarifi → Open → Open</strong> the first time.
+          <strong>App won&apos;t open?</strong> This preview build isn&apos;t Apple-notarized yet.
+          In Finder, go to <strong>Applications</strong>, then <strong>right-click Clarifi → Open → Open</strong> the first time.
+          If Terminal <code>xattr</code> shows &ldquo;Operation not permitted&rdquo;, skip it — right-click Open is the reliable fix.
         </div>
         <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
           Problem?{' '}
