@@ -3,7 +3,7 @@
 #import <Cocoa/Cocoa.h>
 #import <CoreGraphics/CoreGraphics.h>
 
-// Private WindowServer APIs used by Chromium for macOS 15+ capture exclusion.
+// Private WindowServer APIs — used only to CLEAR stale CGS exclusion shapes.
 typedef uint32_t CGSConnectionID;
 typedef NSInteger CGSWindowID;
 typedef CFTypeRef CGRegionRef;
@@ -11,8 +11,6 @@ typedef CFTypeRef CGRegionRef;
 extern "C" {
 CGSConnectionID CGSMainConnectionID(void);
 CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid, CGSWindowID wid, CGRegionRef region);
-CGRegionRef CGRegionCreateWithRect(CGRect rect);
-void CGRegionRelease(CGRegionRef region);
 }
 
 static NSWindow* WindowFromElectronHandle(napi_env env, napi_value handleArg) {
@@ -32,53 +30,27 @@ static NSWindow* WindowFromElectronHandle(napi_env env, napi_value handleArg) {
   return [view window];
 }
 
-static void PrepareWindowForCaptureExclusion(NSWindow* window) {
-  NSView* contentView = [window contentView];
-  if (contentView == nil) {
+static void ClearCaptureExclusionOnWindow(NSWindow* window) {
+  if (window == nil) {
     return;
   }
-  [window setOpaque:NO];
-  [window setBackgroundColor:[NSColor clearColor]];
-  contentView.wantsLayer = YES;
-  contentView.layer.opaque = NO;
-  contentView.layer.backgroundColor = CGColorGetConstantColor(kCGColorClear);
-}
-
-static bool ApplyCaptureExclusionOnWindow(NSWindow* window, bool exclude) {
-  if (window == nil) {
-    return false;
-  }
-
   CGSConnectionID connection = CGSMainConnectionID();
   CGSWindowID windowId = static_cast<CGSWindowID>([window windowNumber]);
-
-  if (!exclude) {
-    return CGSSetWindowCaptureExcludeShape(connection, windowId, nullptr) == kCGErrorSuccess;
-  }
-
-  PrepareWindowForCaptureExclusion(window);
-
-  // Match Chromium NativeWidgetNSWindowBridge::SetAllowScreenshots.
-  CGRect frame = NSRectToCGRect([window frame]);
-  frame.origin = CGPointZero;
-
-  CGRegionRef region = CGRegionCreateWithRect(frame);
-  if (region == nullptr) {
-    return false;
-  }
-  CGError err = CGSSetWindowCaptureExcludeShape(connection, windowId, region);
-  CGRegionRelease(region);
-  return err == kCGErrorSuccess;
+  CGSSetWindowCaptureExcludeShape(connection, windowId, nullptr);
 }
 
-static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
+static bool ClearCaptureExclusion(NSWindow* window) {
   if (window == nil) {
     return false;
   }
 
   __block bool ok = false;
   void (^work)(void) = ^{
-    ok = ApplyCaptureExclusionOnWindow(window, exclude);
+    ClearCaptureExclusionOnWindow(window);
+    for (NSWindow* child in window.childWindows) {
+      ClearCaptureExclusionOnWindow(child);
+    }
+    ok = true;
   };
 
   if ([NSThread isMainThread]) {
@@ -105,7 +77,7 @@ static napi_value SetCaptureExclude(napi_env env, napi_callback_info info) {
   }
 
   NSWindow* window = WindowFromElectronHandle(env, args[0]);
-  bool ok = ApplyCaptureExclusion(window, exclude);
+  bool ok = exclude ? false : ClearCaptureExclusion(window);
 
   napi_value result;
   napi_get_boolean(env, ok, &result);

@@ -103,29 +103,17 @@ function applyStealthProtection(window: BrowserWindow): void {
 
   if (process.platform === 'darwin') {
     const handle = window.getNativeWindowHandle()
-    if (stealthOn) {
-      // CGS exclusion only — setContentProtection paints a grey block on transparent windows.
-      const applied = applyMacCaptureExclusion(handle, true)
-      logStealth('CGS capture exclude', {
-        stealthOn: true,
-        applied,
-        macNative: usesMacCaptureExclusion(),
-      })
-      if (!applied) {
-        warnStealth(
-          'stealth hide-from-share failed — rebuild native module (npm run build:native) and reinstall',
-        )
-      }
-    } else {
-      const cleared = applyMacCaptureExclusion(handle, false)
-      window.setContentProtection(false)
-      window.setBackgroundColor('#00000000')
-      logStealth('CGS capture exclude cleared', {
-        stealthOn: false,
-        applied: cleared,
-        macNative: usesMacCaptureExclusion(),
-      })
-    }
+    // CGSSetWindowCaptureExcludeShape leaves a grey placeholder in Google Meet / Zoom
+    // ScreenCaptureKit feeds. Clear it before applying sharingType-based protection.
+    const cgsCleared = applyMacCaptureExclusion(handle, false)
+    window.setContentProtection(stealthOn)
+    window.setBackgroundColor('#00000000')
+    logStealth('stealth apply', {
+      stealthOn,
+      method: 'setContentProtection',
+      cgsCleared,
+      macNative: usesMacCaptureExclusion(),
+    })
     return
   }
 
