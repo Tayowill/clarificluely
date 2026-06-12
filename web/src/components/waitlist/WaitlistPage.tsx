@@ -252,7 +252,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content waitlist-hero-content" data-reveal>
           <h1 className="waitlist-hero-title">
-            The Unfair Advantage on{' '}
+            The Unfair Advantage For{' '}
             <span className="waitlist-hero-title-accent">Every Sales Call</span>.
           </h1>
           <p>
