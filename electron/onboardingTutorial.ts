@@ -5,7 +5,7 @@ import {
   registerTutorialAccelerators,
   resumeKeybindsAfterTutorial,
 } from './keybindManager'
-import { nudgeOverlayWindow } from './overlay'
+import { nudgeOverlayWindow, toggleOverlayVisibility } from './overlay'
 import { sendOverlayTourStep } from './overlayTour'
 
 export type TutorialStep =
@@ -43,28 +43,26 @@ function unregisterTutorialShortcuts(): void {
 }
 
 function registerTutorialShortcuts(step: TutorialStep): void {
-  pauseKeybindsForTutorial()
   moveDetected = false
 
+  if (step === 'enter') {
+    resumeKeybindsAfterTutorial()
+    return
+  }
+
   if (step === 'toggle') {
+    pauseKeybindsForTutorial()
     const accelerator = getKeybindAccelerator('toggle_overlay')
     registerTutorialAccelerators([accelerator], () => {
       if (activeStep !== 'toggle') return
+      toggleOverlayVisibility()
       sendTutorialEvent('toggle')
     })
     return
   }
 
-  if (step === 'enter') {
-    const accelerator = getKeybindAccelerator('submit')
-    registerTutorialAccelerators([accelerator], () => {
-      if (activeStep !== 'enter') return
-      sendTutorialEvent('enter')
-    })
-    return
-  }
-
   if (step === 'move') {
+    pauseKeybindsForTutorial()
     const accelerators = [
       getKeybindAccelerator('move_up'),
       getKeybindAccelerator('move_down'),
@@ -112,6 +110,7 @@ export function startTutorial(step: TutorialStep): void {
   sendOverlayTourStep(step)
 
   if (step === 'chat' || step === 'screen' || step === 'listen' || step === 'stealth' || step === 'sessions') {
+    resumeKeybindsAfterTutorial()
     return
   }
 

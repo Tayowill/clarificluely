@@ -30,13 +30,13 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     id: 'toggle_overlay',
     label: 'Show / hide overlay',
     description: 'Toggle the Clarifi overlay on screen.',
-    defaultAccelerator: 'CommandOrControl+Shift+Space',
+    defaultAccelerator: 'CommandOrControl+F',
   },
   {
     id: 'submit',
     label: 'Ask or submit',
     description: 'Submit your question or focus the input field.',
-    defaultAccelerator: 'CommandOrControl+Enter',
+    defaultAccelerator: 'Enter',
   },
   {
     id: 'new_chat',
@@ -112,6 +112,12 @@ export function loadKeybindPreferences(): KeybindPreferences {
       if (typeof value === 'string' && value.trim()) {
         cached[def.id] = normalizeAccelerator(value)
       }
+    }
+    if (cached.toggle_overlay === 'CommandOrControl+Shift+Space') {
+      cached.toggle_overlay = 'CommandOrControl+F'
+    }
+    if (cached.submit === 'CommandOrControl+Enter') {
+      cached.submit = 'Enter'
     }
     return cached
   } catch {

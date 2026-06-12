@@ -17,6 +17,7 @@ import {
   getOverlayWindow,
   showOverlayWindow,
 } from './overlay'
+import { registerKeybinds } from './keybindManager'
 import { sendOverlayTourStep } from './overlayTour'
 
 let onboardingWindow: BrowserWindow | null = null
@@ -116,6 +117,7 @@ export async function completeOnboarding(): Promise<void> {
     createOverlayWindow()
   }
   showOverlayWindow()
+  registerKeybinds()
 }
 
 export function destroyOnboardingWindow(): void {

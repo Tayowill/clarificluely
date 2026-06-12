@@ -38,6 +38,10 @@ rm -rf "$TARGET_APP"
 cp -R "$SOURCE_APP" "$TARGET_APP"
 xattr -cr "$TARGET_APP" 2>/dev/null || true
 codesign --remove-signature "$TARGET_APP" 2>/dev/null || true
+NATIVE_MOD="${TARGET_APP}/Contents/Resources/window_capture_exclude.node"
+if [[ -f "$NATIVE_MOD" ]]; then
+  codesign --force --sign - "$NATIVE_MOD" 2>/dev/null || true
+fi
 
 echo ""
 echo "Installed to: $TARGET_APP"

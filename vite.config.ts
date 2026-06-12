@@ -1,8 +1,24 @@
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import { DEFAULT_PRODUCTION_API_URL } from './electron/app-config'
+
+function copyStealthNativePlugin() {
+  return {
+    name: 'copy-stealth-native',
+    closeBundle() {
+      const root = process.cwd()
+      const src = join(root, 'resources/window_capture_exclude.node')
+      if (!existsSync(src)) return
+      const destDir = join(root, 'dist-electron/resources')
+      mkdirSync(destDir, { recursive: true })
+      copyFileSync(src, join(destDir, 'window_capture_exclude.node'))
+    },
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -22,6 +38,7 @@ export default defineConfig(({ mode }) => {
           },
           vite: {
             define: electronDefine,
+            plugins: [copyStealthNativePlugin()],
             build: {
               outDir: 'dist-electron',
               rollupOptions: {

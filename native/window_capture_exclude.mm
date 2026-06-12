@@ -11,6 +11,7 @@ typedef CFTypeRef CGRegionRef;
 extern "C" {
 CGSConnectionID CGSMainConnectionID(void);
 CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid, CGSWindowID wid, CGRegionRef region);
+CGError CGSGetWindowBounds(CGSConnectionID cid, CGSWindowID wid, CGRect* rectOut);
 CGRegionRef CGRegionCreateWithRect(CGRect rect);
 void CGRegionRelease(CGRegionRef region);
 }
@@ -32,25 +33,50 @@ static NSWindow* WindowFromElectronHandle(napi_env env, napi_value handleArg) {
   return [view window];
 }
 
-static void ApplyCaptureExclusion(NSWindow* window, bool exclude) {
+static CGRect CaptureExcludeRect(CGSConnectionID connection, CGSWindowID windowId, NSWindow* window) {
+  CGRect bounds = CGRectZero;
+  if (CGSGetWindowBounds(connection, windowId, &bounds) == kCGErrorSuccess &&
+      bounds.size.width > 0 && bounds.size.height > 0) {
+    bounds.origin = CGPointZero;
+    return bounds;
+  }
+
+  CGRect frame = NSRectToCGRect([window frame]);
+  frame.origin = CGPointZero;
+  if (frame.size.width > 0 && frame.size.height > 0) {
+    return frame;
+  }
+
+  NSRect content = [window contentRectForFrameRect:[window frame]];
+  return CGRectMake(0, 0, content.size.width, content.size.height);
+}
+
+static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
   if (window == nil) {
-    return;
+    return false;
   }
 
   CGSConnectionID connection = CGSMainConnectionID();
   CGSWindowID windowId = static_cast<CGSWindowID>([window windowNumber]);
 
-  if (exclude) {
-    CGRect frame = [window frame];
-    frame.origin = CGPointZero;
-    CGRegionRef region = CGRegionCreateWithRect(frame);
-    if (region != nullptr) {
-      CGSSetWindowCaptureExcludeShape(connection, windowId, region);
-      CGRegionRelease(region);
+  if (!exclude) {
+    CGRect empty = CGRectMake(0, 0, 0, 0);
+    CGRegionRef emptyRegion = CGRegionCreateWithRect(empty);
+    if (emptyRegion != nullptr) {
+      CGSSetWindowCaptureExcludeShape(connection, windowId, emptyRegion);
+      CGRegionRelease(emptyRegion);
     }
-  } else {
-    CGSSetWindowCaptureExcludeShape(connection, windowId, nullptr);
+    return CGSSetWindowCaptureExcludeShape(connection, windowId, nullptr) == kCGErrorSuccess;
   }
+
+  CGRect frame = CaptureExcludeRect(connection, windowId, window);
+  CGRegionRef region = CGRegionCreateWithRect(frame);
+  if (region == nullptr) {
+    return false;
+  }
+  CGError err = CGSSetWindowCaptureExcludeShape(connection, windowId, region);
+  CGRegionRelease(region);
+  return err == kCGErrorSuccess;
 }
 
 static napi_value SetCaptureExclude(napi_env env, napi_callback_info info) {
@@ -68,10 +94,10 @@ static napi_value SetCaptureExclude(napi_env env, napi_callback_info info) {
   }
 
   NSWindow* window = WindowFromElectronHandle(env, args[0]);
-  ApplyCaptureExclusion(window, exclude);
+  bool ok = ApplyCaptureExclusion(window, exclude);
 
   napi_value result;
-  napi_get_boolean(env, window != nil, &result);
+  napi_get_boolean(env, ok, &result);
   return result;
 }
 
