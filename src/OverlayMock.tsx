@@ -1,6 +1,17 @@
 import type { CSSProperties, ReactNode } from 'react'
 import './overlay-mock.css'
 
+export type TourHighlight =
+  | 'toolbar'
+  | 'input'
+  | 'chat'
+  | 'screen'
+  | 'stealth'
+  | 'audio'
+  | 'sessions'
+  | 'mode'
+  | 'move'
+
 function ScreenIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -47,12 +58,21 @@ export type OverlayMockProps = {
   stealthEnabled?: boolean
   followEnabled?: boolean
   isRecording?: boolean
+  showChatPanel?: boolean
+  showModePill?: boolean
+  highlight?: TourHighlight | null
   onStealthClick?: () => void
   onAudioClick?: () => void
+  onScreenClick?: () => void
+  onSessionsClick?: () => void
   showMoveArrows?: boolean
   className?: string
   style?: CSSProperties
   footer?: ReactNode
+}
+
+function highlightClass(target: TourHighlight, highlight?: TourHighlight | null): string {
+  return highlight === target ? 'overlay-mock-tour-highlight' : ''
 }
 
 export default function OverlayMock({
@@ -61,8 +81,12 @@ export default function OverlayMock({
   stealthEnabled = true,
   followEnabled = true,
   isRecording = false,
+  showChatPanel = false,
+  showModePill = true,
+  highlight = null,
   onStealthClick,
   onAudioClick,
+  onScreenClick,
   showMoveArrows = false,
   className = '',
   style,
@@ -70,6 +94,7 @@ export default function OverlayMock({
 }: OverlayMockProps) {
   const stealthInteractive = Boolean(onStealthClick)
   const audioInteractive = Boolean(onAudioClick)
+  const screenInteractive = Boolean(onScreenClick)
 
   return (
     <div className={`overlay-mock ${className}`.trim()} style={style}>
@@ -82,8 +107,8 @@ export default function OverlayMock({
         </div>
       )}
 
-      <div className="overlay-mock-bar">
-        <div className="overlay-mock-input-row">
+      <div className={`overlay-mock-bar ${highlightClass('toolbar', highlight)}`}>
+        <div className={`overlay-mock-input-row ${highlightClass('input', highlight)}`}>
           <input
             type="text"
             className="overlay-mock-input"
@@ -101,19 +126,37 @@ export default function OverlayMock({
             <div className={`overlay-mock-dot ${isRecording ? 'recording' : ''}`} />
             <span className="overlay-mock-brand">Clarifi</span>
 
-            <button
-              type="button"
-              className={`overlay-mock-icon ${screenContextEnabled ? 'active' : ''}`}
-              tabIndex={-1}
-              aria-hidden={!screenContextEnabled}
-            >
-              <ScreenIcon />
-            </button>
+            {showModePill && (
+              <span
+                className={`overlay-mock-mode-pill ${highlightClass('mode', highlight)}`}
+                aria-hidden
+              >
+                General
+              </span>
+            )}
+
+            {screenInteractive ? (
+              <button
+                type="button"
+                className={`overlay-mock-icon ${screenContextEnabled ? 'active' : ''} ${highlightClass('screen', highlight)}`}
+                onClick={onScreenClick}
+                aria-label="Screen context"
+              >
+                <ScreenIcon />
+              </button>
+            ) : (
+              <span
+                className={`overlay-mock-icon ${screenContextEnabled ? 'active' : ''} ${highlightClass('screen', highlight)}`}
+                aria-hidden
+              >
+                <ScreenIcon />
+              </span>
+            )}
 
             {stealthInteractive ? (
               <button
                 type="button"
-                className={`overlay-mock-icon stealth-btn ${stealthEnabled ? 'active' : ''}`}
+                className={`overlay-mock-icon stealth-btn ${stealthEnabled ? 'active' : ''} ${highlightClass('stealth', highlight)}`}
                 onClick={onStealthClick}
                 aria-label="Undetectable on screen share"
               >
@@ -121,7 +164,7 @@ export default function OverlayMock({
               </button>
             ) : (
               <span
-                className={`overlay-mock-icon stealth-btn ${stealthEnabled ? 'active' : ''}`}
+                className={`overlay-mock-icon stealth-btn ${stealthEnabled ? 'active' : ''} ${highlightClass('stealth', highlight)}`}
                 aria-hidden
               >
                 {stealthEnabled ? <StealthHiddenIcon /> : <StealthVisibleIcon />}
@@ -139,7 +182,7 @@ export default function OverlayMock({
             {audioInteractive ? (
               <button
                 type="button"
-                className={`overlay-mock-icon audio-btn ${isRecording ? 'active' : ''}`}
+                className={`overlay-mock-icon audio-btn ${isRecording ? 'active' : ''} ${highlightClass('audio', highlight)}`}
                 onClick={onAudioClick}
                 aria-label="Start audio session"
               >
@@ -152,7 +195,7 @@ export default function OverlayMock({
               </button>
             ) : (
               <span
-                className={`overlay-mock-icon audio-btn ${isRecording ? 'active' : ''}`}
+                className={`overlay-mock-icon audio-btn ${isRecording ? 'active' : ''} ${highlightClass('audio', highlight)}`}
                 aria-hidden
               >
                 <span className={`overlay-mock-waveform ${isRecording ? 'waveform-active' : ''}`}>
@@ -164,12 +207,37 @@ export default function OverlayMock({
               </span>
             )}
 
+            <button
+              type="button"
+              className={`overlay-mock-history ${highlightClass('sessions', highlight)}`}
+              tabIndex={-1}
+              aria-hidden
+            >
+              <span>Sessions</span>
+              <span className="overlay-mock-chevron">▼</span>
+            </button>
+
             <button type="button" className="overlay-mock-history" tabIndex={-1} aria-hidden>
               <span>History</span>
               <span className="overlay-mock-chevron">▼</span>
             </button>
           </div>
         </div>
+
+        {showChatPanel && (
+          <div className={`overlay-mock-chat ${highlightClass('chat', highlight)}`}>
+            <div className="overlay-mock-chat-header">
+              <span className="overlay-mock-chat-back">←</span>
+              <span className="overlay-mock-chat-input">Ask follow-up</span>
+            </div>
+            <div className="overlay-mock-chat-body">
+              <div className="overlay-mock-chat-bubble user">What&apos;s on my screen?</div>
+              <div className="overlay-mock-chat-bubble assistant">
+                I can see your desktop — ask me to summarize or explain anything visible.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {footer}

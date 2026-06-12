@@ -1,11 +1,14 @@
 import * as path from 'path'
 
-import { app, BrowserWindow, globalShortcut } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut } from 'electron'
+import { logStartup, stripMacQuarantine } from './startupDiagnostics'
+import { registerKeybinds } from './keybindManager'
 import { exchangeAuthToken } from './deviceAuth'
 import { registerHandlers } from './ipc/handlers'
 import { loadRuntimeEnv } from './keys'
 import {
   createOnboardingWindow,
+  getOnboardingWindow,
   notifyOnboardingAuthConnected,
 } from './onboarding'
 import { isOnboardingComplete } from './onboardingState'
@@ -15,12 +18,14 @@ import {
   createOverlayWindow,
   destroyOverlayWindow,
   getOverlayWindow,
-  toggleOverlayVisibility,
+  showOverlayWindow,
 } from './overlay'
 import { stopOverlayFollow } from './overlayPosition'
-
 // Show "Clarifi" in the menu bar instead of "Electron" during local dev.
 app.setName('Clarifi')
+
+logStartup('H2', 'main-module-loaded')
+stripMacQuarantine()
 
 // Best-effort: helps setContentProtection on older macOS capture paths (may not affect ScreenCaptureKit/Meet)
 if (process.platform === 'darwin') {
@@ -68,13 +73,45 @@ if (process.platform === 'darwin') {
   })
 }
 
+async function showClarifiUI(): Promise<void> {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.show()
+  }
+
+  const onboardingDone = await isOnboardingComplete()
+  if (!onboardingDone) {
+    destroyOverlayWindow()
+    const onboarding = createOnboardingWindow()
+    onboarding.focus()
+    return
+  }
+
+  if (useDevShell && (!mainWindow || mainWindow.isDestroyed())) {
+    createDevShellWindow()
+    mainWindow?.focus()
+    return
+  }
+
+  const overlay = getOverlayWindow()
+  if (!overlay || overlay.isDestroyed()) {
+    createOverlayWindow()
+    return
+  }
+
+  showOverlayWindow()
+}
+
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
+  logStartup('H3', 'single-instance-lock-denied')
   app.quit()
 } else {
+  logStartup('H3', 'single-instance-lock-acquired')
   app.on('second-instance', (_event, argv) => {
+    logStartup('H3', 'second-instance-received')
     const authUrl = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
     if (authUrl) void handleAuthDeepLink(authUrl)
+    void showClarifiUI()
   })
 }
 
@@ -136,32 +173,51 @@ async function launchClarifi(): Promise<void> {
   }
 
   createOverlayWindow()
+  showOverlayWindow()
 }
 
 app.whenReady().then(async () => {
-  loadRuntimeEnv()
-  registerProtocolClient()
+  logStartup('H2', 'app-ready')
+  try {
+    loadRuntimeEnv()
+    registerProtocolClient()
 
-  const pending = takePendingAuthUrl()
-  if (pending) await handleAuthDeepLink(pending)
+    const pending = takePendingAuthUrl()
+    if (pending) await handleAuthDeepLink(pending)
 
-  if (!isDev && process.argv.length > 1) {
-    const authArg = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
-    if (authArg) await handleAuthDeepLink(authArg)
-  }
+    if (!isDev && process.argv.length > 1) {
+      const authArg = process.argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
+      if (authArg) await handleAuthDeepLink(authArg)
+    }
 
-  await configureUpdater()
-  await initializeStorage()
+    try {
+      await configureUpdater()
+    } catch (err) {
+      console.error('Updater configuration failed:', err)
+    }
 
-  registerHandlers()
-  await launchClarifi()
+    await initializeStorage()
+    registerHandlers()
+    await launchClarifi()
+    registerKeybinds()
+    logStartup('H4', 'launch-complete', {
+      windowCount: BrowserWindow.getAllWindows().length,
+    })
 
-  globalShortcut.register('CommandOrControl+Shift+Space', () => {
-    toggleOverlayVisibility()
-  })
-
-  if (!isDev) {
-    void checkForSignedUpdates()
+    if (!isDev) {
+      void checkForSignedUpdates()
+    }
+  } catch (err) {
+    console.error('Clarifi startup failed:', err)
+    logStartup('H2', 'startup-failed', { error: String(err) })
+    destroyOverlayWindow()
+    createOnboardingWindow()
+    if (app.isPackaged) {
+      dialog.showErrorBox(
+        'Clarifi could not start',
+        'Clarifi hit a startup error. Quit any stuck Clarifi processes in Activity Monitor, then right-click Clarifi in Applications and choose Open.',
+      )
+    }
   }
 })
 
@@ -176,23 +232,11 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('activate', async () => {
-  const onboardingDone = await isOnboardingComplete()
-
-  if (!onboardingDone) {
-    destroyOverlayWindow()
-    createOnboardingWindow()
+app.on('activate', () => {
+  const onboarding = getOnboardingWindow()
+  if (onboarding && !onboarding.isDestroyed()) {
+    onboarding.focus()
     return
   }
-
-  if (useDevShell && BrowserWindow.getAllWindows().length === 0) {
-    createDevShellWindow()
-  }
-
-  const overlay = getOverlayWindow()
-  if (!overlay || overlay.isDestroyed()) {
-    createOverlayWindow()
-  } else if (!overlay.isVisible()) {
-    overlay.showInactive()
-  }
+  void showClarifiUI()
 })

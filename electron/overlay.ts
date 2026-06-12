@@ -1,7 +1,10 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import { applyMacCaptureExclusion } from './windowCaptureExclude'
+import {
+  applyMacCaptureExclusion,
+  isMacCaptureExclusionAvailable,
+} from './windowCaptureExclude'
 import {
   OVERLAY_HEIGHT_COLLAPSED,
   OVERLAY_HEIGHT_EXPANDED,
@@ -23,6 +26,7 @@ import {
 } from './overlayPosition'
 
 let overlayWindow: BrowserWindow | null = null
+let displayMetricsListenerAttached = false
 
 const SETTINGS_FILE = 'overlay-settings.json'
 
@@ -34,8 +38,8 @@ type OverlaySettings = {
 let contentProtectionEnabled = true
 
 /**
- * Stealth uses setContentProtection (legacy capture) plus CGSSetWindowCaptureExcludeShape
- * via native/window_capture_exclude.node on macOS 15+ ScreenCaptureKit paths.
+ * Stealth on macOS 15+: CGSSetWindowCaptureExcludeShape (ScreenCaptureKit / Meet / Zoom).
+ * Legacy fallback: setContentProtection when the native module is unavailable.
  */
 
 function getSettingsFilePath(): string {
@@ -72,16 +76,54 @@ function saveOverlaySettings(): void {
   }
 }
 
-function applyContentProtection(window: BrowserWindow): void {
-  if (process.platform === 'darwin' || process.platform === 'win32') {
-    window.setContentProtection(contentProtectionEnabled)
+function logStealth(message: string, details?: Record<string, unknown>): void {
+  if (process.env.NODE_ENV !== 'development') return
+  if (details) {
+    console.log(`[stealth] ${message}`, details)
+  } else {
+    console.log(`[stealth] ${message}`)
   }
-  if (process.platform === 'darwin' && !window.isDestroyed()) {
+}
+
+function usesMacCaptureExclusion(): boolean {
+  return process.platform === 'darwin' && isMacCaptureExclusionAvailable()
+}
+
+/** Keep transparent backing — setContentProtection breaks glass UI on macOS. */
+function refreshOverlayTransparency(window: BrowserWindow): void {
+  if (window.isDestroyed()) return
+  window.setBackgroundColor('#00000000')
+  if (process.platform !== 'darwin') return
+  const wasVisible = window.isVisible()
+  if (!wasVisible) return
+  window.hide()
+  window.showInactive()
+}
+
+function applyStealthProtection(window: BrowserWindow): void {
+  if (window.isDestroyed()) return
+
+  const stealthOn = contentProtectionEnabled
+  const macNative = usesMacCaptureExclusion()
+
+  if (macNative) {
+    // ScreenCaptureKit path — avoid setContentProtection (causes grey immovable window on toggle).
+    window.setContentProtection(false)
     const handle = window.getNativeWindowHandle()
-    const applied = applyMacCaptureExclusion(handle, contentProtectionEnabled)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[stealth] CGS capture exclude=', contentProtectionEnabled, 'applied=', applied)
-    }
+    const applied = applyMacCaptureExclusion(handle, stealthOn)
+    logStealth('CGS capture exclude', { stealthOn, applied, path: 'native' })
+    return
+  }
+
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    window.setContentProtection(stealthOn)
+    logStealth('setContentProtection fallback', { stealthOn, path: 'legacy' })
+  }
+
+  if (process.platform === 'darwin') {
+    const handle = window.getNativeWindowHandle()
+    const applied = applyMacCaptureExclusion(handle, stealthOn)
+    logStealth('CGS capture exclude (module missing)', { stealthOn, applied })
   }
 }
 
@@ -115,11 +157,11 @@ export function reapplyOverlayWindowPolicies(): void {
   }
 }
 
-/** Apply workspace, stealth, and z-order. Content protection runs AFTER workspace visibility. */
+/** Apply workspace, stealth, and z-order. Stealth runs AFTER workspace visibility. */
 function applyOverlayWindowPolicies(window: BrowserWindow): void {
   if (window.isDestroyed()) return
   applyWorkspaceVisibility(window)
-  applyContentProtection(window)
+  applyStealthProtection(window)
   if (process.platform === 'darwin') {
     window.setAlwaysOnTop(true, 'floating', 1)
   } else {
@@ -127,20 +169,44 @@ function applyOverlayWindowPolicies(window: BrowserWindow): void {
   }
 }
 
+function attachDisplayMetricsListener(): void {
+  if (displayMetricsListenerAttached || process.platform !== 'darwin') return
+  displayMetricsListenerAttached = true
+  screen.on('display-metrics-changed', () => {
+    if (!contentProtectionEnabled) return
+    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      applyStealthProtection(overlayWindow)
+      logStealth('re-applied after display-metrics-changed')
+    }
+  })
+}
+
+function scheduleMacStealthReapply(detectable: boolean): void {
+  const reapply = () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      applyStealthProtection(overlayWindow)
+    }
+  }
+  setTimeout(reapply, 150)
+  if (detectable) {
+    setTimeout(reapply, 400)
+  }
+}
+
 export function setContentProtectionEnabled(enabled: boolean): void {
   contentProtectionEnabled = enabled
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[stealth] contentProtection=', enabled)
-  }
+  const macNative = usesMacCaptureExclusion()
+  logStealth('toggle', { enabled, macNative })
+
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    applyOverlayWindowPolicies(overlayWindow)
-    if (process.platform === 'darwin') {
-      setTimeout(() => {
-        if (overlayWindow && !overlayWindow.isDestroyed()) {
-          applyContentProtection(overlayWindow)
-          broadcastProtectionState()
-        }
-      }, 120)
+    if (macNative) {
+      applyStealthProtection(overlayWindow)
+      if (process.platform === 'darwin') {
+        scheduleMacStealthReapply(!enabled)
+      }
+    } else {
+      applyOverlayWindowPolicies(overlayWindow)
+      refreshOverlayTransparency(overlayWindow)
     }
   }
   saveOverlaySettings()
@@ -173,16 +239,27 @@ export {
   isOverlayFollowEnabled,
 }
 
+export function showOverlayWindow(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  overlayWindow.showInactive()
+  applyOverlayWindowPolicies(overlayWindow)
+}
+
 export function createOverlayWindow(): BrowserWindow {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    if (!overlayWindow.isVisible()) {
-      overlayWindow.showInactive()
-    }
-    reapplyOverlayWindowPolicies()
+    showOverlayWindow()
     return overlayWindow
   }
 
   loadOverlaySettings()
+  attachDisplayMetricsListener()
+
+  if (process.platform === 'darwin') {
+    logStealth('startup', {
+      macNative: usesMacCaptureExclusion(),
+      stealthOn: contentProtectionEnabled,
+    })
+  }
 
   const saved = loadOverlayPosition()
   const savedSize = loadOverlaySize()
@@ -200,6 +277,7 @@ export function createOverlayWindow(): BrowserWindow {
     height: initialHeight,
     x: initial.x,
     y: initial.y,
+    show: false,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
@@ -222,7 +300,7 @@ export function createOverlayWindow(): BrowserWindow {
 
   overlayWindow.on('resize', () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
-      applyContentProtection(overlayWindow)
+      applyStealthProtection(overlayWindow)
     }
   })
 
@@ -232,14 +310,18 @@ export function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  if (process.env.NODE_ENV === 'development') {
+  overlayWindow.once('ready-to-show', () => {
+    showOverlayWindow()
+  })
+
+  const isDev = !app.isPackaged
+  if (isDev) {
     const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173'
     const loadDevOverlay = () => {
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         void overlayWindow.loadURL(`${devUrl}/overlay.html`)
       }
     }
-    // Load immediately; retry briefly if Vite is still starting.
     loadDevOverlay()
     setTimeout(loadDevOverlay, 800)
   } else {
@@ -254,6 +336,7 @@ export function createOverlayWindow(): BrowserWindow {
 function attachMovePersistence(window: BrowserWindow): void {
   window.on('moved', () => {
     onOverlayMoved(window)
+    applyStealthProtection(window)
   })
 }
 
@@ -274,8 +357,7 @@ export function toggleOverlayVisibility(): void {
   if (overlayWindow.isVisible()) {
     overlayWindow.hide()
   } else {
-    overlayWindow.showInactive()
-    applyOverlayWindowPolicies(overlayWindow)
+    showOverlayWindow()
   }
 }
 
@@ -324,6 +406,7 @@ export function setOverlaySize(
   if (persist) {
     saveOverlaySize(clamped.width, clamped.height)
   }
+  applyStealthProtection(overlayWindow)
 }
 
 export function getOverlaySize(): { width: number; height: number } {

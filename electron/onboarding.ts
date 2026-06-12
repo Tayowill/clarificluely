@@ -11,7 +11,13 @@ import {
   reapplyAuthPaneBounds,
   setAuthPaneParent,
 } from './onboardingAuthPane'
-import { createOverlayWindow, destroyOverlayWindow } from './overlay'
+import {
+  createOverlayWindow,
+  destroyOverlayWindow,
+  getOverlayWindow,
+  showOverlayWindow,
+} from './overlay'
+import { sendOverlayTourStep } from './overlayTour'
 
 let onboardingWindow: BrowserWindow | null = null
 
@@ -83,8 +89,20 @@ export function createOnboardingWindow(): BrowserWindow {
   return onboardingWindow
 }
 
+export function beginLiveOverlayTour(): void {
+  if (!getOverlayWindow() || getOverlayWindow()?.isDestroyed()) {
+    createOverlayWindow()
+  }
+  showOverlayWindow()
+}
+
+export function endLiveOverlayTour(): void {
+  sendOverlayTourStep(null)
+}
+
 export async function completeOnboarding(): Promise<void> {
   stopTutorial()
+  endLiveOverlayTour()
   hideAuthPane()
   await markOnboardingComplete()
 
@@ -94,7 +112,10 @@ export async function completeOnboarding(): Promise<void> {
     setTutorialOnboardingWindow(null)
   }
 
-  createOverlayWindow()
+  if (!getOverlayWindow() || getOverlayWindow()?.isDestroyed()) {
+    createOverlayWindow()
+  }
+  showOverlayWindow()
 }
 
 export function destroyOnboardingWindow(): void {

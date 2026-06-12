@@ -70,8 +70,13 @@ import {
   showAuthPane,
   syncAuthPaneBounds,
 } from '../onboardingAuthPane'
-import { completeOnboarding } from '../onboarding'
 import {
+  beginLiveOverlayTour,
+  completeOnboarding,
+  endLiveOverlayTour,
+} from '../onboarding'
+import {
+  isTutorialStep,
   signalTutorialAction,
   startTutorial,
   stopTutorial,
@@ -135,6 +140,7 @@ import {
   removeCustomModel,
   setActiveMode,
   setActiveModel,
+  setShowModelInToolbar,
   toPublicPreferences,
   type ModelProvider,
 } from '../userPreferences'
@@ -1018,7 +1024,7 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     (data) => {
       const payload = data as { step?: TutorialStep }
       const step = payload.step
-      if (!step || !['enter', 'move', 'listen', 'stealth'].includes(step)) {
+      if (!step || !isTutorialStep(step)) {
         throw new Error('invalid tutorial step')
       }
       startTutorial(step)
@@ -1027,6 +1033,17 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
   )
 
   registerValidatedHandler('onboarding:stop-tutorial', {}, () => {
+    stopTutorial()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('onboarding:begin-live-tour', {}, () => {
+    beginLiveOverlayTour()
+    return { ok: true }
+  })
+
+  registerValidatedHandler('onboarding:end-live-tour', {}, () => {
+    endLiveOverlayTour()
     stopTutorial()
     return { ok: true }
   })
@@ -1075,7 +1092,7 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     { requiresInput: true },
     (data) => {
       const payload = data as { type?: TutorialStep }
-      if (!payload.type || !['enter', 'move', 'listen', 'stealth'].includes(payload.type)) {
+      if (!payload.type || !isTutorialStep(payload.type)) {
         throw new Error('invalid tutorial signal')
       }
       signalTutorialAction(payload.type)
@@ -1096,6 +1113,18 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
         throw new Error('modelId is required')
       }
       return setActiveModel(payload.modelId)
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:set-show-model-in-toolbar',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { show?: boolean }
+      if (typeof payload.show !== 'boolean') {
+        throw new Error('show is required')
+      }
+      return setShowModelInToolbar(payload.show)
     },
   )
 

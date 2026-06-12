@@ -8,11 +8,16 @@ type Step =
   | 'welcome'
   | 'sign-in'
   | 'permissions'
-  | 'shortcut-enter'
-  | 'shortcut-move'
-  | 'shortcut-listen'
-  | 'shortcut-stealth'
-  | 'paywall'
+  | 'tour-intro'
+  | 'tour-toggle'
+  | 'tour-ask'
+  | 'tour-chat'
+  | 'tour-screen'
+  | 'tour-audio'
+  | 'tour-stealth'
+  | 'tour-move'
+  | 'tour-sessions'
+  | 'ready'
 
 type PermissionKind = 'accessibility' | 'microphone' | 'screen'
 
@@ -23,40 +28,60 @@ type PermissionState = {
   allGranted: boolean
 }
 
-type TutorialStep = 'enter' | 'move' | 'listen' | 'stealth'
+type TutorialStep =
+  | 'toggle'
+  | 'enter'
+  | 'chat'
+  | 'screen'
+  | 'listen'
+  | 'stealth'
+  | 'move'
+  | 'sessions'
 
 const STEPS: Step[] = [
   'welcome',
   'sign-in',
   'permissions',
-  'shortcut-enter',
-  'shortcut-move',
-  'shortcut-listen',
-  'shortcut-stealth',
-  'paywall',
+  'tour-intro',
+  'tour-toggle',
+  'tour-ask',
+  'tour-chat',
+  'tour-screen',
+  'tour-audio',
+  'tour-stealth',
+  'tour-move',
+  'tour-sessions',
+  'ready',
 ]
+
+const LIVE_TOUR_STEPS: Step[] = [
+  'tour-intro',
+  'tour-toggle',
+  'tour-ask',
+  'tour-chat',
+  'tour-screen',
+  'tour-audio',
+  'tour-stealth',
+  'tour-move',
+  'tour-sessions',
+]
+
+function LiveTourHint({ children }: { children: ReactNode }) {
+  return (
+    <div className="live-tour-hint">
+      <div className="live-tour-hint-badge">
+        <span>↑</span> Live overlay active
+      </div>
+      <p>{children}</p>
+    </div>
+  )
+}
 
 type PreviewPanelProps = {
   step: Step
   mockOffset: { x: number; y: number }
   onPreviewListen: () => void
   onPreviewStealth: () => void
-}
-
-function MeetingMockFooter() {
-  return (
-    <div className="overlay-mock-video">
-      <div className="overlay-mock-video-tiles">
-        <div className="overlay-mock-video-tile" />
-        <div className="overlay-mock-video-tile" />
-      </div>
-      <div className="overlay-mock-video-controls">
-        <span>Unmute</span>
-        <span>Start Video</span>
-        <span className="overlay-mock-video-end">End</span>
-      </div>
-    </div>
-  )
 }
 
 function PreviewPanel({ step, mockOffset, onPreviewListen, onPreviewStealth }: PreviewPanelProps) {
@@ -121,79 +146,143 @@ function PreviewPanel({ step, mockOffset, onPreviewListen, onPreviewStealth }: P
     )
   }
 
-  if (step === 'shortcut-enter') {
-    return <OverlayMock placeholder="Ask me anything" />
-  }
-
-  if (step === 'shortcut-move') {
+  if (step === 'tour-intro') {
     return (
       <OverlayMock
         placeholder="Ask me anything"
-        showMoveArrows
-        style={{ transform: `translate(${mockOffset.x}px, ${mockOffset.y}px)` }}
+        showChatPanel
+        highlight="toolbar"
+        footer={
+          <LiveTourHint>
+            This is the Clarifi bar — a small overlay at the top of your screen. The next steps use
+            the <strong>live bar</strong> above your desktop.
+          </LiveTourHint>
+        }
       />
     )
   }
 
-  if (step === 'shortcut-listen') {
+  if (step === 'tour-toggle') {
     return (
       <OverlayMock
         placeholder="Ask me anything"
+        highlight="toolbar"
+        footer={
+          <LiveTourHint>
+            Press <strong>⌘⇧Space</strong> on the live bar to show or hide Clarifi any time.
+          </LiveTourHint>
+        }
+      />
+    )
+  }
+
+  if (step === 'tour-ask') {
+    return (
+      <OverlayMock placeholder="What's on my screen?" highlight="input" footer={<LiveTourHint>Type a question in the live bar, then press <strong>⌘↵</strong> to submit.</LiveTourHint>} />
+    )
+  }
+
+  if (step === 'tour-chat') {
+    return (
+      <OverlayMock
+        showChatPanel
+        highlight="chat"
+        footer={
+          <LiveTourHint>
+            Answers open in a panel below the bar. Press <strong>← Back</strong> on the live overlay
+            to collapse it.
+          </LiveTourHint>
+        }
+      />
+    )
+  }
+
+  if (step === 'tour-screen') {
+    return (
+      <OverlayMock
+        screenContextEnabled
+        highlight="screen"
+        footer={
+          <LiveTourHint>
+            Turn on the <strong>screen icon</strong> on the live bar before asking about what you
+            see.
+          </LiveTourHint>
+        }
+      />
+    )
+  }
+
+  if (step === 'tour-audio') {
+    return (
+      <OverlayMock
         isRecording={previewRecording}
+        highlight="audio"
         onAudioClick={() => {
           setPreviewRecording(true)
           onPreviewListen()
         }}
-        footer={<MeetingMockFooter />}
+        footer={
+          <LiveTourHint>
+            Tap the <strong>waveform</strong> on the live bar to start or stop a listening session.
+          </LiveTourHint>
+        }
       />
     )
   }
 
-  if (step === 'shortcut-stealth') {
+  if (step === 'tour-stealth') {
     return (
       <OverlayMock
-        placeholder="Ask me anything"
         stealthEnabled
+        highlight="stealth"
         onStealthClick={onPreviewStealth}
-        footer={<MeetingMockFooter />}
+        footer={
+          <LiveTourHint>
+            The <strong>green eye</strong> means Clarifi is hidden from screen share and recordings.
+          </LiveTourHint>
+        }
       />
     )
   }
 
-  if (step === 'paywall') {
+  if (step === 'tour-move') {
     return (
-      <div className="paywall-grid">
-        <div className="paywall-card pro">
-          <h4>Pro</h4>
-          <div className="paywall-price">
-            $20<span>/mo</span>
-          </div>
-          <ul className="paywall-features">
-            <li>Unlimited AI responses</li>
-            <li>Unlimited audio sessions</li>
-            <li>Access to newest AI models</li>
-            <li>Priority chat support</li>
-          </ul>
-          <button type="button" className="paywall-card-btn">
-            Upgrade
-          </button>
-        </div>
-        <div className="paywall-card undetect">
-          <span className="paywall-badge">Popular</span>
-          <h4>Pro + Undetectability</h4>
-          <div className="paywall-price">
-            $49<span>/mo</span>
-          </div>
-          <ul className="paywall-features">
-            <li>Everything in Pro</li>
-            <li>Hidden from screen share</li>
-            <li>Team admin dashboard</li>
-            <li>Dedicated support</li>
-          </ul>
-          <button type="button" className="paywall-card-btn">
-            Upgrade
-          </button>
-        </div>
+      <OverlayMock
+        showMoveArrows
+        highlight="toolbar"
+        style={{ transform: `translate(${mockOffset.x}px, ${mockOffset.y}px)` }}
+        footer={
+          <LiveTourHint>
+            Drag the live toolbar to reposition, or use <strong>⌘ + arrow keys</strong>.
+          </LiveTourHint>
+        }
+      />
+    )
+  }
+
+  if (step === 'tour-sessions') {
+    return (
+      <OverlayMock
+        highlight="sessions"
+        footer={
+          <LiveTourHint>
+            Open <strong>Sessions</strong> or <strong>History</strong> on the live bar to revisit
+            recordings and past chats.
+          </LiveTourHint>
+        }
+      />
+    )
+  }
+
+  if (step === 'ready') {
+    return (
+      <div className="preview-complete">
+        <div className="preview-complete-icon">✓</div>
+        <h3>You&apos;re ready</h3>
+        <p style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+          Press <strong>⌘⇧Space</strong> whenever you need Clarifi. Replay this tour anytime from
+          Settings.
+        </p>
       </div>
     )
   }
@@ -356,12 +445,27 @@ export default function OnboardingApp() {
     return () => window.clearInterval(interval)
   }, [step, refreshPermissions])
 
-  // Tutorial steps
+  // Live overlay tour — show real bar alongside onboarding
+  useEffect(() => {
+    if (LIVE_TOUR_STEPS.includes(step)) {
+      void window.electronAPI.invoke('onboarding:begin-live-tour')
+      return
+    }
+    if (step === 'welcome' || step === 'sign-in' || step === 'permissions') {
+      void window.electronAPI.invoke('onboarding:end-live-tour')
+    }
+  }, [step])
+
+  // Tutorial steps (drives shortcuts + live overlay highlights)
   const tutorialStep: TutorialStep | null = useMemo(() => {
-    if (step === 'shortcut-enter') return 'enter'
-    if (step === 'shortcut-move') return 'move'
-    if (step === 'shortcut-listen') return 'listen'
-    if (step === 'shortcut-stealth') return 'stealth'
+    if (step === 'tour-toggle') return 'toggle'
+    if (step === 'tour-ask') return 'enter'
+    if (step === 'tour-chat') return 'chat'
+    if (step === 'tour-screen') return 'screen'
+    if (step === 'tour-audio') return 'listen'
+    if (step === 'tour-stealth') return 'stealth'
+    if (step === 'tour-move') return 'move'
+    if (step === 'tour-sessions') return 'sessions'
     return null
   }, [step])
 
@@ -416,10 +520,6 @@ export default function OnboardingApp() {
     }
     return { label: 'Allow accessibility access', kind: 'accessibility' as const }
   }, [permissions])
-
-  const openBilling = useCallback(async () => {
-    await window.electronAPI.invoke('onboarding:open-billing')
-  }, [])
 
   let leftContent: ReactNode
   let primaryCta: ReactNode
@@ -499,6 +599,11 @@ export default function OnboardingApp() {
         {permissions.allGranted && (
           <p className="onboarding-status-text success">All permissions granted</p>
         )}
+        <div className="onboarding-permission-note">
+          <strong>Accessibility not sticking?</strong> Quit Clarifi completely after enabling it in
+          System Settings, then reopen from Applications. Permissions are tied to the exact app you
+          installed.
+        </div>
       </>
     )
     if (permissions.allGranted) {
@@ -519,13 +624,62 @@ export default function OnboardingApp() {
         </button>
       )
     }
-  } else if (step === 'shortcut-enter') {
+  } else if (step === 'tour-intro') {
     leftContent = (
       <>
-        <h2 className="onboarding-heading">Press ⌘↵ to get an instant answer</h2>
+        <h2 className="onboarding-heading">Meet your overlay</h2>
         <p className="onboarding-sub">
-          Clarifi uses your screen context to respond — try the shortcut while practicing with the
-          preview on the right.
+          Clarifi lives in a small bar at the top of your screen — not a normal app window. The
+          preview shows the layout; the next steps use the <strong>live bar</strong> on your
+          desktop.
+        </p>
+        <ul className="onboarding-tour-list">
+          <li>Top row — type questions here</li>
+          <li>Toolbar — modes, screen, stealth, audio, history</li>
+          <li>Chat panel — opens below when you ask something</li>
+        </ul>
+      </>
+    )
+    primaryCta = (
+      <button type="button" className="onboarding-cta onboarding-cta-primary" onClick={goNext}>
+        Start the tour
+        <span>›</span>
+      </button>
+    )
+  } else if (step === 'tour-toggle') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Show and hide Clarifi</h2>
+        <p className="onboarding-sub">
+          The overlay is easy to miss. Use this shortcut any time to toggle it on or off.
+        </p>
+        <div className="onboarding-press-row">
+          <span className="onboarding-kbd">⌘</span>
+          <span className="onboarding-kbd-plus">+</span>
+          <span className="onboarding-kbd">⇧</span>
+          <span className="onboarding-kbd-plus">+</span>
+          <span className="onboarding-kbd">Space</span>
+        </div>
+      </>
+    )
+    primaryCta = (
+      <button
+        type="button"
+        className="onboarding-cta onboarding-cta-secondary"
+        onClick={goNext}
+        disabled={!tutorialDone}
+      >
+        {tutorialDone ? 'Continue' : 'Press ⌘⇧Space on the live bar'}
+        {tutorialDone && <span>›</span>}
+      </button>
+    )
+  } else if (step === 'tour-ask') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Ask a question</h2>
+        <p className="onboarding-sub">
+          Type in the live bar, then submit. Try &ldquo;What&apos;s on my screen?&rdquo; — you&apos;ll
+          enable screen access in a later step.
         </p>
         <div className="onboarding-press-row">
           <span className="onboarding-kbd">⌘</span>
@@ -541,15 +695,101 @@ export default function OnboardingApp() {
         onClick={goNext}
         disabled={!tutorialDone}
       >
-        {tutorialDone ? 'Continue' : 'Use the shortcut to continue'}
+        {tutorialDone ? 'Continue' : 'Submit a question with ⌘↵'}
         {tutorialDone && <span>›</span>}
       </button>
     )
-  } else if (step === 'shortcut-move') {
+  } else if (step === 'tour-chat') {
     leftContent = (
       <>
-        <h2 className="onboarding-heading">Now, try to move Clarifi around</h2>
-        <p className="onboarding-sub">You can move it in any direction with your keyboard.</p>
+        <h2 className="onboarding-heading">The chat panel</h2>
+        <p className="onboarding-sub">
+          Answers open in a panel below the bar. Use the back arrow to collapse to the compact bar
+          when you want more screen space.
+        </p>
+      </>
+    )
+    primaryCta = (
+      <button
+        type="button"
+        className="onboarding-cta onboarding-cta-secondary"
+        onClick={goNext}
+        disabled={!tutorialDone}
+      >
+        {tutorialDone ? 'Continue' : 'Press ← Back on the live overlay'}
+        {tutorialDone && <span>›</span>}
+      </button>
+    )
+  } else if (step === 'tour-screen') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Screen context</h2>
+        <p className="onboarding-sub">
+          Turn on the <strong>screen icon</strong> before asking about what you&apos;re viewing.
+          macOS must allow screen recording for Clarifi.
+        </p>
+      </>
+    )
+    primaryCta = (
+      <button
+        type="button"
+        className="onboarding-cta onboarding-cta-secondary"
+        onClick={goNext}
+        disabled={!tutorialDone}
+      >
+        {tutorialDone ? 'Continue' : 'Enable screen context on the live bar'}
+        {tutorialDone && <span>›</span>}
+      </button>
+    )
+  } else if (step === 'tour-audio') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Listen in meetings</h2>
+        <p className="onboarding-sub">
+          Tap the waveform button to start an audio session. Clarifi transcribes your microphone and
+          meeting audio in real time.
+        </p>
+      </>
+    )
+    primaryCta = (
+      <button
+        type="button"
+        className="onboarding-cta onboarding-cta-secondary"
+        onClick={goNext}
+        disabled={!tutorialDone}
+      >
+        {tutorialDone ? 'Continue' : 'Start a session on the live bar'}
+        {tutorialDone && <span>›</span>}
+      </button>
+    )
+  } else if (step === 'tour-stealth') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Stay hidden on share</h2>
+        <p className="onboarding-sub">
+          The <strong>green eye</strong> means Clarifi is hidden from Zoom, Meet, and screen
+          recordings. Tap it on the live bar to toggle.
+        </p>
+      </>
+    )
+    primaryCta = (
+      <button
+        type="button"
+        className="onboarding-cta onboarding-cta-secondary"
+        onClick={goNext}
+        disabled={!tutorialDone}
+      >
+        {tutorialDone ? 'Continue' : 'Tap the eye icon on the live bar'}
+        {tutorialDone && <span>›</span>}
+      </button>
+    )
+  } else if (step === 'tour-move') {
+    leftContent = (
+      <>
+        <h2 className="onboarding-heading">Move the overlay</h2>
+        <p className="onboarding-sub">
+          Drag the toolbar to reposition, or nudge it with the keyboard.
+        </p>
         <div className="onboarding-shortcut-row">
           <div className="onboarding-arrow-grid">
             <div className="spacer" />
@@ -577,17 +817,17 @@ export default function OnboardingApp() {
         onClick={goNext}
         disabled={!tutorialDone}
       >
-        {tutorialDone ? 'Continue' : 'Use the shortcut to continue'}
+        {tutorialDone ? 'Continue' : 'Move the live bar with ⌘ + arrows'}
         {tutorialDone && <span>›</span>}
       </button>
     )
-  } else if (step === 'shortcut-listen') {
+  } else if (step === 'tour-sessions') {
     leftContent = (
       <>
-        <h2 className="onboarding-heading">Clarifi can also listen to you</h2>
+        <h2 className="onboarding-heading">Sessions &amp; history</h2>
         <p className="onboarding-sub">
-          Click the audio icon on the right side of the bar to start a session. Clarifi listens to
-          your microphone and meeting audio.
+          <strong>Sessions</strong> stores audio recordings and recaps. <strong>History</strong>{' '}
+          keeps your past chats. Open either from the right side of the toolbar.
         </p>
       </>
     )
@@ -598,37 +838,17 @@ export default function OnboardingApp() {
         onClick={goNext}
         disabled={!tutorialDone}
       >
-        {tutorialDone ? 'Continue' : 'Start a listening session to continue'}
+        {tutorialDone ? 'Continue' : 'Open Sessions or History on the live bar'}
         {tutorialDone && <span>›</span>}
       </button>
     )
-  } else if (step === 'shortcut-stealth') {
+  } else if (step === 'ready') {
     leftContent = (
       <>
-        <h2 className="onboarding-heading">Clarifi stays undetectable</h2>
+        <h2 className="onboarding-heading">You&apos;re all set</h2>
         <p className="onboarding-sub">
-          The green eye means you&apos;re hidden from screen share and recordings. Click it in the
-          preview to continue.
-        </p>
-      </>
-    )
-    primaryCta = (
-      <button
-        type="button"
-        className="onboarding-cta onboarding-cta-secondary"
-        onClick={goNext}
-        disabled={!tutorialDone}
-      >
-        {tutorialDone ? 'Continue' : 'Click the green eye to continue'}
-        {tutorialDone && <span>›</span>}
-      </button>
-    )
-  } else if (step === 'paywall') {
-    leftContent = (
-      <>
-        <h2 className="onboarding-heading">Unlock all features with Clarifi Pro</h2>
-        <p className="onboarding-sub">
-          Get unlimited sessions, priority support, and undetectability on screen share.
+          Clarifi is ready. Press <strong>⌘⇧Space</strong> whenever you need it. Replay this tour
+          from Settings → Replay product tour.
         </p>
       </>
     )
@@ -636,20 +856,11 @@ export default function OnboardingApp() {
       <button
         type="button"
         className="onboarding-cta onboarding-cta-primary"
-        onClick={() => void openBilling()}
-      >
-        View plans
-        <span>›</span>
-      </button>
-    )
-    secondaryCta = (
-      <button
-        type="button"
-        className="onboarding-skip"
         onClick={() => void finishOnboarding()}
         disabled={completing}
       >
-        {completing ? 'Starting Clarifi…' : 'Start with free →'}
+        {completing ? 'Opening Clarifi…' : 'Open Clarifi'}
+        <span>›</span>
       </button>
     )
   }

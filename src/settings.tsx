@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ANTHROPIC_LEGACY_DIVIDER_BEFORE,
+  sortAnthropicModels,
+} from './lib/anthropic-models'
 import { acceleratorToKeyLabels, keyboardEventToAccelerator } from './lib/keybindDisplay'
 import './settings.css'
 
@@ -31,6 +35,7 @@ type PublicPreferences = {
   models: ModelConfig[]
   activeModeId: string
   modes: ModeConfig[]
+  showModelInToolbar: boolean
 }
 
 type SettingsTab =
@@ -313,29 +318,6 @@ function groupModelsByProvider(models: ModelConfig[]): Map<ModelProvider, ModelC
   return map
 }
 
-function getAnthropicFamily(label: string): string {
-  const lower = label.toLowerCase()
-  if (lower.includes('haiku')) return 'Haiku'
-  if (lower.includes('sonnet')) return 'Sonnet'
-  if (lower.includes('opus')) return 'Opus'
-  return 'Other'
-}
-
-function groupAnthropicByFamily(models: ModelConfig[]): Map<string, ModelConfig[]> {
-  const order = ['Haiku', 'Sonnet', 'Opus', 'Other']
-  const map = new Map<string, ModelConfig[]>()
-  for (const family of order) {
-    map.set(family, [])
-  }
-  for (const model of models) {
-    const family = getAnthropicFamily(model.label)
-    const list = map.get(family) ?? []
-    list.push(model)
-    map.set(family, list)
-  }
-  return map
-}
-
 export default function SettingsApp() {
   const [tab, setTab] = useState<SettingsTab>('profile')
   const [prefs, setPrefs] = useState<PublicPreferences | null>(null)
@@ -604,6 +586,13 @@ export default function SettingsApp() {
 
   const setActiveModel = async (modelId: string) => {
     const data = (await window.electronAPI.invoke('prefs:set-active-model', { modelId })) as PublicPreferences
+    setPrefs(data)
+  }
+
+  const setShowModelInToolbar = async (show: boolean) => {
+    const data = (await window.electronAPI.invoke('prefs:set-show-model-in-toolbar', {
+      show,
+    })) as PublicPreferences
     setPrefs(data)
   }
 
@@ -1114,6 +1103,31 @@ export default function SettingsApp() {
               renderPrefsLoading()
             ) : (
               <>
+                <div className="settings-card" style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                    }}
+                  >
+                    <div>
+                      <div className="settings-card-title">Overlay toolbar</div>
+                      <p className="settings-section-desc" style={{ margin: '6px 0 0' }}>
+                        Add a model picker to the overlay toolbar for quick switching.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-btn small ${prefs.showModelInToolbar ? 'active-pill' : 'primary'}`}
+                      onClick={() => void setShowModelInToolbar(!prefs.showModelInToolbar)}
+                    >
+                      {prefs.showModelInToolbar ? 'On' : 'Add to toolbar'}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="settings-provider-list">
                   {PROVIDER_ORDER.map((provider) => {
                     const models = modelGroups.get(provider) ?? []
@@ -1123,8 +1137,10 @@ export default function SettingsApp() {
                     const activeInProvider = models.some(
                       (m: ModelConfig) => m.id === prefs.activeModelId,
                     )
-                    const anthropicFamilies =
-                      provider === 'anthropic' ? groupAnthropicByFamily(models) : null
+                    const anthropicModels =
+                      provider === 'anthropic'
+                        ? sortAnthropicModels<ModelConfig>(models)
+                        : null
 
                     const renderModelRow = (model: ModelConfig) => (
                       <div key={model.id} className="settings-model-row">
@@ -1181,16 +1197,15 @@ export default function SettingsApp() {
 
                         {isExpanded && (
                           <div className="settings-provider-body">
-                            {anthropicFamilies ? (
-                              Array.from(anthropicFamilies.entries()).map(([family, familyModels]) => {
-                                if (familyModels.length === 0) return null
-                                return (
-                                  <div key={family} className="settings-model-family">
-                                    <div className="settings-model-family-label">{family}</div>
-                                    {familyModels.map(renderModelRow)}
-                                  </div>
-                                )
-                              })
+                            {anthropicModels ? (
+                              anthropicModels.map((model) => (
+                                <div key={model.id}>
+                                  {model.id === ANTHROPIC_LEGACY_DIVIDER_BEFORE && (
+                                    <div className="settings-model-divider" />
+                                  )}
+                                  {renderModelRow(model)}
+                                </div>
+                              ))
                             ) : (
                               models.map(renderModelRow)
                             )}
@@ -1932,7 +1947,7 @@ export default function SettingsApp() {
               <path d="M3 12a9 9 0 1 0 3-6.7" />
               <path d="M3 4v5h5" />
             </svg>
-            Reset onboarding
+            Replay product tour
           </button>
           <button type="button" className="settings-footer-action" onClick={logoutAccount}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { anthropicShortLabel } from './lib/anthropic-models'
 import {
   collectParticipants,
   displaySpeakerForEntry,
@@ -217,6 +218,7 @@ type PublicPreferences = {
   models: ModelConfig[]
   activeModeId: string
   modes: ModeConfig[]
+  showModelInToolbar: boolean
 }
 
 function formatRelativeTime(ts: number): string {
@@ -558,7 +560,9 @@ export default function Overlay() {
   const [transcriptionActivity, setTranscriptionActivity] = useState<
     'silent' | 'listening' | 'transcribing'
   >('listening')
+  const [tourStep, setTourStep] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const prevPanelForTourRef = useRef<PanelMode>('bar')
   const streamRef = useRef<MediaStream | null>(null)
   const isCapturingRef = useRef(false)
   const mimeTypeRef = useRef('audio/webm')
@@ -635,6 +639,44 @@ export default function Overlay() {
     syncHeight()
   }, [syncHeight])
 
+  const tourHighlight = useCallback(
+    (target: string) => {
+      const active =
+        tourStep === target ||
+        (tourStep === 'enter' && target === 'input') ||
+        (tourStep === 'toggle' && target === 'toolbar')
+      return active ? ' overlay-tour-highlight' : ''
+    },
+    [tourStep],
+  )
+
+  useEffect(() => {
+    window.electronAPI.on('overlay:tour', (payload) => {
+      const data = payload as { step?: string | null }
+      setTourStep(data?.step ?? null)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (tourStep === 'listen' && isRecording) {
+      void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'listen' })
+    }
+  }, [tourStep, isRecording])
+
+  useEffect(() => {
+    if (tourStep === 'chat' && prevPanelForTourRef.current === 'chat' && panelMode === 'bar') {
+      void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'chat' })
+    }
+    if (
+      tourStep === 'sessions' &&
+      prevPanelForTourRef.current === 'bar' &&
+      (panelMode === 'history' || panelMode === 'audio_sessions')
+    ) {
+      void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'sessions' })
+    }
+    prevPanelForTourRef.current = panelMode
+  }, [panelMode, tourStep])
+
   useEffect(() => {
     window.electronAPI.on('transcript:update', (payload) => {
       const parsed = parseTranscriptPayload(payload)
@@ -683,6 +725,12 @@ export default function Overlay() {
       if (prefs.transcriptionMode) setTranscriptionMode(prefs.transcriptionMode)
     })
   }, [])
+
+  useEffect(() => {
+    if (!prefs?.showModelInToolbar) {
+      setModelMenuOpen(false)
+    }
+  }, [prefs?.showModelInToolbar])
 
   useEffect(() => {
     if (!modelMenuOpen) return
@@ -889,6 +937,9 @@ export default function Overlay() {
       if (typeof result?.enabled === 'boolean') {
         setStealthEnabled(result.enabled)
       }
+      if (tourStep === 'stealth') {
+        void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'stealth' })
+      }
     } catch {
       setStealthEnabled(!next)
     }
@@ -900,6 +951,9 @@ export default function Overlay() {
     }
     if (typeof result?.enabled === 'boolean') {
       setScreenContextEnabled(result.enabled)
+      if (result.enabled && tourStep === 'screen') {
+        void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'screen' })
+      }
     }
   }
 
@@ -1634,7 +1688,6 @@ export default function Overlay() {
     prefs?.models.find((m) => m.id === prefs?.activeModelId) ?? prefs?.models[0] ?? null
   const activeMode =
     prefs?.modes.find((m) => m.id === prefs?.activeModeId) ?? prefs?.modes[0] ?? null
-
   const openSettings = (
     tab: 'profile' | 'models' | 'modes' | 'integrations' | 'keybinds' | 'audio' = 'profile',
   ) => {
@@ -2134,7 +2187,7 @@ export default function Overlay() {
   )
 
   const renderToolbar = () => (
-    <div className="overlay-toolbar">
+    <div className={`overlay-toolbar${tourHighlight('toolbar')}`}>
       <div className="toolbar-left">
         <div
           className={`overlay-dot ${isRecording ? (isPaused ? 'paused' : 'recording') : ''}`}
@@ -2147,35 +2200,41 @@ export default function Overlay() {
           Clarifi
         </button>
 
-        <div className="toolbar-model-wrap" ref={modelMenuRef}>
-          <button
-            type="button"
-            className={`toolbar-pill ${modelMenuOpen ? 'active' : ''}`}
-            onClick={() => setModelMenuOpen((open) => !open)}
-          >
-            <span className="toolbar-pill-label">{activeModel?.label ?? 'Model'}</span>
-            <span className="chevron">▼</span>
-          </button>
-          {modelMenuOpen && (
-            <div className="toolbar-model-menu">
-              <button
-                type="button"
-                className="toolbar-model-item"
-                onClick={() => {
-                  setModelMenuOpen(false)
-                  openSettings('models')
-                }}
-              >
-                Change model
-              </button>
-            </div>
-          )}
-        </div>
+        {prefs?.showModelInToolbar && (
+          <div className="toolbar-model-wrap" ref={modelMenuRef}>
+            <button
+              type="button"
+              className={`toolbar-pill ${modelMenuOpen ? 'active' : ''}`}
+              onClick={() => setModelMenuOpen((open) => !open)}
+            >
+              <span className="toolbar-pill-label">
+                {activeModel?.provider === 'anthropic'
+                  ? anthropicShortLabel(activeModel.label)
+                  : (activeModel?.label ?? 'Model')}
+              </span>
+              <span className="chevron">▼</span>
+            </button>
+            {modelMenuOpen && (
+              <div className="toolbar-model-menu">
+                <button
+                  type="button"
+                  className="toolbar-model-item"
+                  onClick={() => {
+                    setModelMenuOpen(false)
+                    openSettings('models')
+                  }}
+                >
+                  All models
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <ToolbarTooltip label="Change mode & system prompt">
           <button
             type="button"
-            className="toolbar-pill toolbar-mode-btn"
+            className={`toolbar-pill toolbar-mode-btn${tourHighlight('mode')}`}
             onClick={() => openSettings('modes')}
           >
             <span className="toolbar-pill-label">{activeMode?.label ?? 'Mode'}</span>
@@ -2185,7 +2244,7 @@ export default function Overlay() {
         <ToolbarTooltip label="Uses Screen">
           <button
             type="button"
-            className={`toolbar-icon ${screenContextEnabled ? 'active' : ''}`}
+            className={`toolbar-icon ${screenContextEnabled ? 'active' : ''}${tourHighlight('screen')}`}
             onClick={() => void toggleScreenContext()}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2199,7 +2258,7 @@ export default function Overlay() {
         <ToolbarTooltip label={stealthEnabled ? 'Hidden from share' : 'Detectable'}>
           <button
             type="button"
-            className={`toolbar-icon stealth-btn ${stealthEnabled ? 'active' : ''}`}
+            className={`toolbar-icon stealth-btn ${stealthEnabled ? 'active' : ''}${tourHighlight('stealth')}`}
             aria-pressed={stealthEnabled}
             aria-label={stealthEnabled ? 'Hidden from share' : 'Detectable on share'}
             onClick={() => void toggleStealth()}
@@ -2255,7 +2314,7 @@ export default function Overlay() {
         >
           <button
             type="button"
-            className={`toolbar-icon audio-btn ${isRecording ? 'active' : ''}`}
+            className={`toolbar-icon audio-btn ${isRecording ? 'active' : ''}${tourHighlight('audio')}`}
             onClick={toggleRecording}
           >
             <span
@@ -2278,7 +2337,7 @@ export default function Overlay() {
         <ToolbarTooltip label="Audio sessions">
           <button
             type="button"
-            className={`toolbar-history ${panelMode === 'audio_sessions' ? 'active' : ''}`}
+            className={`toolbar-history ${panelMode === 'audio_sessions' ? 'active' : ''}${tourHighlight('sessions')}`}
             onClick={toggleAudioSessions}
           >
             <span>Sessions</span>
@@ -2289,7 +2348,7 @@ export default function Overlay() {
         <ToolbarTooltip label="History">
           <button
             type="button"
-            className={`toolbar-history ${panelMode === 'history' ? 'active' : ''}`}
+            className={`toolbar-history ${panelMode === 'history' ? 'active' : ''}${tourHighlight('sessions')}`}
             onClick={toggleHistory}
           >
             <span>History</span>
@@ -2309,11 +2368,11 @@ export default function Overlay() {
       <div className="overlay-root overlay-root-chat">
         <ResizeHandles onResize={applyBounds} />
         <div className="overlay-panel">
-          <form className="chat-header" onSubmit={(e) => void handleSubmit(e)}>
+          <form className={`chat-header${tourHighlight('chat')}`} onSubmit={(e) => void handleSubmit(e)}>
             <ToolbarTooltip label="Back" placement="below">
               <button
                 type="button"
-                className="chat-back-btn"
+                className={`chat-back-btn${tourHighlight('chat')}`}
                 onClick={handleBack}
                 aria-label="Back"
               >
@@ -2416,7 +2475,10 @@ export default function Overlay() {
       <ResizeHandles onResize={applyBounds} />
       <div className="overlay-bar">
         {renderConnectBanner()}
-        <form className="overlay-input-row" onSubmit={(e) => void handleSubmit(e)}>
+        <form
+          className={`overlay-input-row${tourHighlight('input')}`}
+          onSubmit={(e) => void handleSubmit(e)}
+        >
           {hasActiveChat && panelMode === 'bar' && (
             <ToolbarTooltip label="Back to chat" placement="below">
               <button

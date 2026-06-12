@@ -48,9 +48,16 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+echo "Stopping stuck Clarifi processes..."
+pkill -f "Clarifi.app/Contents/MacOS/Clarifi" 2>/dev/null || true
+sleep 1
+
 echo "Clearing quarantine on: $APP_PATH"
-xattr -dr com.apple.quarantine "$APP_PATH" 2>/dev/null || true
+if ! xattr -dr com.apple.quarantine "$APP_PATH" 2>/dev/null; then
+  echo "Note: xattr failed (common in /Applications). Use RIGHT-CLICK → Open instead."
+fi
 xattr -cr "$APP_PATH" 2>/dev/null || true
+codesign --remove-signature "$APP_PATH" 2>/dev/null || true
 
 QUARANTINE="$(xattr -p com.apple.quarantine "$APP_PATH" 2>/dev/null || echo none)"
 SIGNATURE="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -E 'Signature=|Authority=' | tr '\n' ' ' || echo unknown)"
@@ -58,5 +65,5 @@ SIGNATURE="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -E 'Signature=|Aut
 log_event "H5" "Cleared quarantine before open" "{\"appPath\":\"$APP_PATH\",\"quarantineAfter\":\"$QUARANTINE\",\"signature\":\"$SIGNATURE\"}"
 
 echo "Opening Clarifi..."
-echo "(If macOS still blocks it: right-click Clarifi.app → Open → Open again.)"
-open "$APP_PATH"
+echo "If nothing appears: Finder → right-click Clarifi.app → Open → Open."
+open "$APP_PATH" 2>/dev/null || true

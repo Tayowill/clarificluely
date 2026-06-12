@@ -41,12 +41,16 @@ export async function requestPermission(kind: PermissionKind): Promise<boolean> 
   }
 
   switch (kind) {
-    case 'accessibility':
-      return systemPreferences.isTrustedAccessibilityClient(true)
+    case 'accessibility': {
+      const trusted = systemPreferences.isTrustedAccessibilityClient(true)
+      if (!trusted) {
+        openPermissionSettings('accessibility')
+      }
+      return systemPreferences.isTrustedAccessibilityClient(false)
+    }
     case 'microphone':
       return systemPreferences.askForMediaAccess('microphone')
     case 'screen':
-      // macOS only grants screen capture after user enables it in System Settings.
       openPermissionSettings('screen')
       return mapMediaStatus(systemPreferences.getMediaAccessStatus('screen'))
     default:

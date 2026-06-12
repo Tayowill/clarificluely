@@ -58,6 +58,8 @@ const INVOKE_CHANNELS = [
   'onboarding:open-billing',
   'onboarding:start-tutorial',
   'onboarding:stop-tutorial',
+  'onboarding:begin-live-tour',
+  'onboarding:end-live-tour',
   'onboarding:tutorial-signal',
   'permissions:status',
   'permissions:request',
@@ -65,6 +67,7 @@ const INVOKE_CHANNELS = [
   'prefs:load',
   'prefs:save',
   'prefs:set-active-model',
+  'prefs:set-show-model-in-toolbar',
   'prefs:set-active-mode',
   'prefs:add-mode',
   'prefs:remove-mode',
@@ -103,6 +106,7 @@ const EVENT_CHANNELS = [
   'keybinds:prefs-changed',
   'settings:tab',
   'overlay:protection-changed',
+  'overlay:tour',
 ] as const
 
 type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

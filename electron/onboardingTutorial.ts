@@ -1,10 +1,25 @@
-import { BrowserWindow, globalShortcut } from 'electron'
+import { BrowserWindow } from 'electron'
+import { getKeybindAccelerator } from './keybindPreferences'
+import {
+  pauseKeybindsForTutorial,
+  registerTutorialAccelerators,
+  resumeKeybindsAfterTutorial,
+} from './keybindManager'
+import { nudgeOverlayWindow } from './overlay'
+import { sendOverlayTourStep } from './overlayTour'
 
-export type TutorialStep = 'enter' | 'move' | 'listen' | 'stealth'
+export type TutorialStep =
+  | 'toggle'
+  | 'enter'
+  | 'chat'
+  | 'screen'
+  | 'listen'
+  | 'stealth'
+  | 'move'
+  | 'sessions'
 
 let activeStep: TutorialStep | null = null
 let onboardingWindow: BrowserWindow | null = null
-let shortcutsRegistered = false
 let moveDetected = false
 
 const NUDGE_PX = 20
@@ -24,54 +39,79 @@ function sendMockNudge(dx: number, dy: number): void {
 }
 
 function unregisterTutorialShortcuts(): void {
-  if (!shortcutsRegistered) return
-  const keys = [
-    'CommandOrControl+Enter',
-    'CommandOrControl+Up',
-    'CommandOrControl+Down',
-    'CommandOrControl+Left',
-    'CommandOrControl+Right',
-  ]
-  for (const key of keys) {
-    if (globalShortcut.isRegistered(key)) {
-      globalShortcut.unregister(key)
-    }
-  }
-  shortcutsRegistered = false
+  resumeKeybindsAfterTutorial()
 }
 
 function registerTutorialShortcuts(step: TutorialStep): void {
-  unregisterTutorialShortcuts()
+  pauseKeybindsForTutorial()
   moveDetected = false
 
+  if (step === 'toggle') {
+    const accelerator = getKeybindAccelerator('toggle_overlay')
+    registerTutorialAccelerators([accelerator], () => {
+      if (activeStep !== 'toggle') return
+      sendTutorialEvent('toggle')
+    })
+    return
+  }
+
   if (step === 'enter') {
-    globalShortcut.register('CommandOrControl+Enter', () => {
+    const accelerator = getKeybindAccelerator('submit')
+    registerTutorialAccelerators([accelerator], () => {
       if (activeStep !== 'enter') return
       sendTutorialEvent('enter')
     })
-    shortcutsRegistered = true
     return
   }
 
   if (step === 'move') {
-    const onMove = (dx: number, dy: number) => {
+    const accelerators = [
+      getKeybindAccelerator('move_up'),
+      getKeybindAccelerator('move_down'),
+      getKeybindAccelerator('move_left'),
+      getKeybindAccelerator('move_right'),
+    ]
+    const handlers = new Map<string, () => void>([
+      [getKeybindAccelerator('move_up'), () => onMove(0, -NUDGE_PX)],
+      [getKeybindAccelerator('move_down'), () => onMove(0, NUDGE_PX)],
+      [getKeybindAccelerator('move_left'), () => onMove(-NUDGE_PX, 0)],
+      [getKeybindAccelerator('move_right'), () => onMove(NUDGE_PX, 0)],
+    ])
+
+    function onMove(dx: number, dy: number): void {
       sendMockNudge(dx, dy)
+      nudgeOverlayWindow(dx, dy)
       if (activeStep !== 'move' || moveDetected) return
       moveDetected = true
       sendTutorialEvent('move')
     }
-    globalShortcut.register('CommandOrControl+Up', () => onMove(0, -NUDGE_PX))
-    globalShortcut.register('CommandOrControl+Down', () => onMove(0, NUDGE_PX))
-    globalShortcut.register('CommandOrControl+Left', () => onMove(-NUDGE_PX, 0))
-    globalShortcut.register('CommandOrControl+Right', () => onMove(NUDGE_PX, 0))
-    shortcutsRegistered = true
+
+    registerTutorialAccelerators(accelerators, (accelerator) => {
+      handlers.get(accelerator)?.()
+    })
   }
+}
+
+const TUTORIAL_STEPS: TutorialStep[] = [
+  'toggle',
+  'enter',
+  'chat',
+  'screen',
+  'listen',
+  'stealth',
+  'move',
+  'sessions',
+]
+
+export function isTutorialStep(value: string): value is TutorialStep {
+  return (TUTORIAL_STEPS as string[]).includes(value)
 }
 
 export function startTutorial(step: TutorialStep): void {
   activeStep = step
+  sendOverlayTourStep(step)
 
-  if (step === 'listen' || step === 'stealth') {
+  if (step === 'chat' || step === 'screen' || step === 'listen' || step === 'stealth' || step === 'sessions') {
     return
   }
 
@@ -82,9 +122,14 @@ export function stopTutorial(): void {
   activeStep = null
   moveDetected = false
   unregisterTutorialShortcuts()
+  sendOverlayTourStep(null)
 }
 
 export function signalTutorialAction(type: TutorialStep): void {
   if (activeStep !== type) return
   sendTutorialEvent(type)
+}
+
+export function getActiveTutorialStep(): TutorialStep | null {
+  return activeStep
 }
