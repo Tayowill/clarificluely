@@ -102,20 +102,29 @@ function applyStealthProtection(window: BrowserWindow): void {
   const stealthOn = contentProtectionEnabled
 
   if (process.platform === 'darwin') {
-    // Never use setContentProtection on macOS — it paints a grey block in screen capture.
-    window.setContentProtection(false)
     const handle = window.getNativeWindowHandle()
-    const applied = applyMacCaptureExclusion(handle, stealthOn)
-    logStealth('CGS capture exclude', {
-      stealthOn,
-      applied,
-      macNative: usesMacCaptureExclusion(),
-    })
-    if (stealthOn && !applied) {
-      warnStealth(
-        'stealth hide-from-share failed — rebuild native module (npm run build:native) and reinstall',
-        { stealthOn },
-      )
+    if (stealthOn) {
+      // CGS exclusion only — setContentProtection paints a grey block on transparent windows.
+      const applied = applyMacCaptureExclusion(handle, true)
+      logStealth('CGS capture exclude', {
+        stealthOn: true,
+        applied,
+        macNative: usesMacCaptureExclusion(),
+      })
+      if (!applied) {
+        warnStealth(
+          'stealth hide-from-share failed — rebuild native module (npm run build:native) and reinstall',
+        )
+      }
+    } else {
+      const cleared = applyMacCaptureExclusion(handle, false)
+      window.setContentProtection(false)
+      window.setBackgroundColor('#00000000')
+      logStealth('CGS capture exclude cleared', {
+        stealthOn: false,
+        applied: cleared,
+        macNative: usesMacCaptureExclusion(),
+      })
     }
     return
   }
@@ -172,7 +181,6 @@ function attachDisplayMetricsListener(): void {
   if (displayMetricsListenerAttached || process.platform !== 'darwin') return
   displayMetricsListenerAttached = true
   screen.on('display-metrics-changed', () => {
-    if (!contentProtectionEnabled) return
     if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
       applyStealthProtection(overlayWindow)
       logStealth('re-applied after display-metrics-changed')

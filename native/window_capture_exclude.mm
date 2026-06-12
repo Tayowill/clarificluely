@@ -11,7 +11,6 @@ typedef CFTypeRef CGRegionRef;
 extern "C" {
 CGSConnectionID CGSMainConnectionID(void);
 CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid, CGSWindowID wid, CGRegionRef region);
-CGError CGSGetWindowBounds(CGSConnectionID cid, CGSWindowID wid, CGRect* rectOut);
 CGRegionRef CGRegionCreateWithRect(CGRect rect);
 void CGRegionRelease(CGRegionRef region);
 }
@@ -33,25 +32,19 @@ static NSWindow* WindowFromElectronHandle(napi_env env, napi_value handleArg) {
   return [view window];
 }
 
-static CGRect CaptureExcludeRect(CGSConnectionID connection, CGSWindowID windowId, NSWindow* window) {
-  CGRect bounds = CGRectZero;
-  if (CGSGetWindowBounds(connection, windowId, &bounds) == kCGErrorSuccess &&
-      bounds.size.width > 0 && bounds.size.height > 0) {
-    bounds.origin = CGPointZero;
-    return bounds;
+static void PrepareWindowForCaptureExclusion(NSWindow* window) {
+  NSView* contentView = [window contentView];
+  if (contentView == nil) {
+    return;
   }
-
-  CGRect frame = NSRectToCGRect([window frame]);
-  frame.origin = CGPointZero;
-  if (frame.size.width > 0 && frame.size.height > 0) {
-    return frame;
-  }
-
-  NSRect content = [window contentRectForFrameRect:[window frame]];
-  return CGRectMake(0, 0, content.size.width, content.size.height);
+  [window setOpaque:NO];
+  [window setBackgroundColor:[NSColor clearColor]];
+  contentView.wantsLayer = YES;
+  contentView.layer.opaque = NO;
+  contentView.layer.backgroundColor = CGColorGetConstantColor(kCGColorClear);
 }
 
-static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
+static bool ApplyCaptureExclusionOnWindow(NSWindow* window, bool exclude) {
   if (window == nil) {
     return false;
   }
@@ -60,16 +53,15 @@ static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
   CGSWindowID windowId = static_cast<CGSWindowID>([window windowNumber]);
 
   if (!exclude) {
-    CGRect empty = CGRectMake(0, 0, 0, 0);
-    CGRegionRef emptyRegion = CGRegionCreateWithRect(empty);
-    if (emptyRegion != nullptr) {
-      CGSSetWindowCaptureExcludeShape(connection, windowId, emptyRegion);
-      CGRegionRelease(emptyRegion);
-    }
     return CGSSetWindowCaptureExcludeShape(connection, windowId, nullptr) == kCGErrorSuccess;
   }
 
-  CGRect frame = CaptureExcludeRect(connection, windowId, window);
+  PrepareWindowForCaptureExclusion(window);
+
+  // Match Chromium NativeWidgetNSWindowBridge::SetAllowScreenshots.
+  CGRect frame = NSRectToCGRect([window frame]);
+  frame.origin = CGPointZero;
+
   CGRegionRef region = CGRegionCreateWithRect(frame);
   if (region == nullptr) {
     return false;
@@ -77,6 +69,25 @@ static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
   CGError err = CGSSetWindowCaptureExcludeShape(connection, windowId, region);
   CGRegionRelease(region);
   return err == kCGErrorSuccess;
+}
+
+static bool ApplyCaptureExclusion(NSWindow* window, bool exclude) {
+  if (window == nil) {
+    return false;
+  }
+
+  __block bool ok = false;
+  void (^work)(void) = ^{
+    ok = ApplyCaptureExclusionOnWindow(window, exclude);
+  };
+
+  if ([NSThread isMainThread]) {
+    work();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), work);
+  }
+
+  return ok;
 }
 
 static napi_value SetCaptureExclude(napi_env env, napi_callback_info info) {
