@@ -6,7 +6,6 @@ import {
   entriesToDisplayLines,
   isDiarizedSpeakerLabel,
   speakerColorClass,
-  speakerInitial,
   type SpeakerLabels,
 } from './lib/transcriptSpeakers'
 import './overlay.css'
@@ -54,6 +53,49 @@ type LiveSessionInsights = {
   openQuestions: string[]
 }
 
+type SalesCardKind =
+  | 'speak_now'
+  | 'technical_lookup'
+  | 'objection'
+  | 'product_info'
+  | 'discovery'
+  | 'next_step'
+
+type SalesAssistAction = {
+  kind: SalesCardKind
+  label: string
+  speakable: string
+  context?: string
+}
+
+type SalesDefineEntry = {
+  term: string
+  speakable: string
+  context?: string
+}
+
+type SalesPanelPayload = {
+  answer?: SalesAssistAction | null
+  suggestions?: SalesAssistAction[]
+  opening?: SalesAssistAction[] | null
+}
+
+type SalesPanelErrorPayload = {
+  error: { error: string; message?: string }
+}
+
+function isSalesAssistErrorPayload(
+  payload: { error?: unknown },
+): payload is { error: string; message?: string } {
+  return typeof payload.error === 'string'
+}
+
+type SalesObjectionRecap = {
+  type: string
+  summary: string
+  handled: string
+}
+
 type SessionRecap = {
   summary: string
   highlights: string[]
@@ -62,6 +104,18 @@ type SessionRecap = {
   decisions?: string[]
   openQuestions: string[]
   recapEmailDraft: string
+  dealSummary?: string
+  painPointsUncovered?: string[]
+  objectionsRaised?: SalesObjectionRecap[]
+  competitorsMentioned?: string[]
+  budgetTimelineSignals?: string[]
+  buyingSignals?: string[]
+  stakeholderMap?: string[]
+  riskFlags?: string[]
+  mutualActionPlan?: string[]
+  nextCallAgenda?: string[]
+  prospectFollowUpEmail?: string
+  internalCrmNote?: string
 }
 
 function formatRecapDate(timestamp: number): string {
@@ -90,7 +144,7 @@ type TranscriptEntry = {
   at: number
 }
 
-const MIC_SEGMENT_MS = 5000
+const MIC_SEGMENT_MS = 2000
 const MIC_SPEECH_RMS_MIN = 0.008
 
 function formatTranscriptTime(at: number): string {
@@ -119,16 +173,109 @@ function normalizeEntry(entry: TranscriptEntry): TranscriptEntry {
   }
 }
 
+const TITLE_STOP_WORDS = new Set([
+  'that',
+  'this',
+  'with',
+  'have',
+  'from',
+  'they',
+  'what',
+  'when',
+  'your',
+  'about',
+  'would',
+  'could',
+  'there',
+  'their',
+  'been',
+  'were',
+  'will',
+  'just',
+  'like',
+  'know',
+  'think',
+  'going',
+  'really',
+  'some',
+  'into',
+  'than',
+  'them',
+  'then',
+  'also',
+  'very',
+  'only',
+  'over',
+  'such',
+  'need',
+  'want',
+  'yeah',
+  'okay',
+  'right',
+  'well',
+  'mean',
+  'thank',
+  'thanks',
+  'hello',
+  'sorry',
+])
+
+function titleFromTranscriptKeywords(entries: TranscriptEntry[]): string | null {
+  if (entries.length === 0) return null
+
+  const prospectQuestion = entries.find(
+    (entry) =>
+      (entry.source === 'system' || entry.speaker === 'Them') &&
+      entry.text.includes('?') &&
+      entry.text.trim().length > 15,
+  )
+  if (prospectQuestion) {
+    const question = `${prospectQuestion.text.split('?')[0].trim()}?`
+    return question.length > 80 ? `${question.slice(0, 77)}...` : question
+  }
+
+  const fullText = entries.map((entry) => entry.text).join(' ')
+  const counts = new Map<string, number>()
+  for (const word of fullText.toLowerCase().match(/[a-z][a-z]{3,}/g) ?? []) {
+    if (TITLE_STOP_WORDS.has(word)) continue
+    counts.set(word, (counts.get(word) ?? 0) + 1)
+  }
+  const topWords = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([word]) => word)
+  if (topWords.length >= 2) {
+    return topWords.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' · ')
+  }
+
+  const firstSubstantial = entries.find((entry) => entry.text.trim().length > 12)
+  if (firstSubstantial) {
+    const snippet = firstSubstantial.text.trim().split(/[.!?]/)[0]?.trim()
+    if (snippet) return snippet.slice(0, 80)
+  }
+
+  return null
+}
+
 function generateAudioSessionTitle(
   recap: SessionRecap | null,
   startedAt: number | null,
+  transcript: TranscriptEntry[] = [],
 ): string {
-  if (recap?.summary) {
-    const sentence = recap.summary.split(/[.!?]/)[0]?.trim()
-    if (sentence && sentence.length > 0) {
-      return sentence.slice(0, 80)
-    }
+  if (recap?.dealSummary?.trim()) {
+    return recap.dealSummary.trim().slice(0, 80)
   }
+  if (recap?.painPointsUncovered?.[0]?.trim()) {
+    return recap.painPointsUncovered[0].trim().slice(0, 80)
+  }
+  if (recap?.summary?.trim()) {
+    const sentence = recap.summary.split(/[.!?]/)[0]?.trim()
+    if (sentence) return sentence.slice(0, 80)
+  }
+
+  const fromTranscript = titleFromTranscriptKeywords(transcript)
+  if (fromTranscript) return fromTranscript
+
   const date = new Date(startedAt ?? Date.now())
   return `Audio session ${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
@@ -219,6 +366,7 @@ type PublicPreferences = {
   activeModeId: string
   modes: ModeConfig[]
   showModelInToolbar: boolean
+  productKnowledge?: string
 }
 
 function formatRelativeTime(ts: number): string {
@@ -379,10 +527,39 @@ const entityIcons: Record<SessionEntity['type'], string> = {
   other: '📌',
 }
 
+const salesActionIcons: Record<SalesCardKind, string> = {
+  speak_now: '💬',
+  technical_lookup: '📘',
+  objection: '💬',
+  product_info: '📘',
+  discovery: '❓',
+  next_step: '💬',
+}
+
+const salesActionColors: Record<SalesCardKind, string> = {
+  speak_now: 'rgba(34, 197, 94, 0.2)',
+  technical_lookup: 'rgba(59, 130, 246, 0.2)',
+  objection: 'rgba(239, 68, 68, 0.2)',
+  product_info: 'rgba(59, 130, 246, 0.2)',
+  discovery: 'rgba(249, 115, 22, 0.2)',
+  next_step: 'rgba(16, 185, 129, 0.2)',
+}
+
+function isSalesRecap(recap: SessionRecap): boolean {
+  return Boolean(
+    recap.dealSummary ||
+      recap.mutualActionPlan?.length ||
+      recap.prospectFollowUpEmail ||
+      recap.internalCrmNote ||
+      recap.objectionsRaised?.length,
+  )
+}
+
 const OVERLAY_HEIGHT_COLLAPSED = 132
 const OVERLAY_HEIGHT_CONNECT = 204
 const OVERLAY_HEIGHT_EXPANDED = 360
 const OVERLAY_HEIGHT_CHAT = 480
+const OVERLAY_HEIGHT_CHAT_EXPANDED = 560
 const OVERLAY_HEIGHT_LIVE_SESSION = 580
 const OVERLAY_HEIGHT_SESSION_RECAP = 640
 const DEFAULT_MEETING_MINUTES = 60
@@ -541,8 +718,19 @@ export default function Overlay() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [fullTranscript, setFullTranscript] = useState<TranscriptEntry[]>([])
   const [sessionInsights, setSessionInsights] = useState<LiveSessionInsights | null>(null)
+  const [salesAnswer, setSalesAnswer] = useState<SalesAssistAction | null>(null)
+  const [salesSuggestions, setSalesSuggestions] = useState<SalesAssistAction[]>([])
+  const [salesOpening, setSalesOpening] = useState<SalesAssistAction[]>([])
+  const [salesDefines, setSalesDefines] = useState<SalesDefineEntry[]>([])
+  const [salesAssistError, setSalesAssistError] = useState('')
   const [sessionRecap, setSessionRecap] = useState<SessionRecap | null>(null)
   const [showLiveInsights, setShowLiveInsights] = useState(true)
+  const [showLiveTranscript, setShowLiveTranscript] = useState(false)
+  const [expandedSalesAction, setExpandedSalesAction] = useState<number | null>(null)
+  const [expandedSalesDefine, setExpandedSalesDefine] = useState<number | null>(null)
+  const prevSalesAnswerRef = useRef<SalesAssistAction | null>(null)
+  const [audioRenamingId, setAudioRenamingId] = useState<string | null>(null)
+  const [audioRenameDraft, setAudioRenameDraft] = useState('')
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [recapLoading, setRecapLoading] = useState(false)
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null)
@@ -580,12 +768,17 @@ export default function Overlay() {
   const needsConnect = connectionState === 'needs_connect'
 
   const isAudioSessionDetail = panelMode === 'audio_session_detail'
-  const isChatPanel = panelMode === 'chat' || chatLoading || isAudioSessionDetail
+  const isDropdownPanel = panelMode === 'history' || panelMode === 'audio_sessions'
   const hasActiveChat = chatMessages.length > 0
+  const isChatPanel =
+    panelMode === 'chat' ||
+    chatLoading ||
+    isAudioSessionDetail ||
+    (isDropdownPanel && hasActiveChat)
   const isLiveSession = panelMode === 'live_session' && isRecording
   const isSessionRecap = panelMode === 'session_recap'
   const isLivePanel = isLiveSession || isSessionRecap
-  const isExpanded = panelMode === 'history' || panelMode === 'audio_sessions' || isLivePanel
+  const isExpanded = isDropdownPanel || isLivePanel
   const allChatSessions = (() => {
     const sessions = [...chatSessions]
     if (activeSessionId && chatMessages.length > 0) {
@@ -613,27 +806,101 @@ export default function Overlay() {
     suggestions.length > 0 ||
     Boolean(status)
 
+  const applySalesAssistPayload = useCallback((payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return
+
+    const data = payload as SalesPanelPayload & SalesPanelErrorPayload & {
+      actions?: SalesAssistAction[]
+      primaryCard?: SalesAssistAction
+      secondaryCards?: SalesAssistAction[]
+      error?: { error: string; message?: string } | string
+      message?: string
+    }
+
+    const errObj =
+      data.error && typeof data.error === 'object' && 'error' in data.error
+        ? (data.error as { error: string; message?: string })
+        : isSalesAssistErrorPayload(data)
+          ? { error: data.error, message: data.message }
+          : null
+
+    if (errObj) {
+      setSalesAssistError(
+        errObj.message?.trim() ||
+          (errObj.error === 'no_api_key'
+            ? 'Add ANTHROPIC_API_KEY to .env.local or set a model key in Settings.'
+            : errObj.error === 'rate_limit_exceeded'
+              ? 'Assist is updating too quickly — wait a few seconds.'
+              : 'Assist is temporarily unavailable.'),
+      )
+      return
+    }
+
+    // Legacy combined payload support
+    if (Array.isArray(data.actions) && data.actions.length > 0) {
+      const answer =
+        data.actions.find((action) => action.kind === 'product_info' || action.kind === 'objection') ??
+        data.actions[0]
+      setSalesAnswer(answer)
+      setSalesSuggestions(
+        data.actions.filter((action) => action !== answer && action.kind !== 'technical_lookup'),
+      )
+      setSalesAssistError('')
+      return
+    }
+
+    if (data.answer !== undefined) {
+      if (data.answer) {
+        const prev = prevSalesAnswerRef.current
+        if (!prev || prev.label !== data.answer.label || prev.kind !== data.answer.kind) {
+          setExpandedSalesAction(0)
+        }
+        prevSalesAnswerRef.current = data.answer
+        setSalesAnswer(data.answer)
+      }
+    }
+
+    if (data.suggestions !== undefined) {
+      setSalesSuggestions(data.suggestions)
+    }
+
+    if (data.opening !== undefined) {
+      setSalesOpening(data.opening ?? [])
+    }
+
+    if (data.answer || data.suggestions || data.opening) {
+      setSalesAssistError('')
+    }
+  }, [])
+
+  const applySalesDefinePayload = useCallback((payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return
+    const defines = (payload as { defines?: SalesDefineEntry[] }).defines
+    if (!Array.isArray(defines)) return
+    setSalesDefines(defines.slice(-3))
+  }, [])
+
   const applyBounds = useCallback((width: number, height: number, persist = false) => {
     void window.electronAPI.invoke('overlay:set-bounds', { width, height, persist })
   }, [])
 
   const syncHeight = useCallback(() => {
     let height = needsConnect ? OVERLAY_HEIGHT_CONNECT : OVERLAY_HEIGHT_COLLAPSED
-    if (panelMode === 'chat' || chatLoading) {
-      height = OVERLAY_HEIGHT_CHAT
-    } else if (panelMode === 'live_session') {
+    if (panelMode === 'live_session') {
       height = OVERLAY_HEIGHT_LIVE_SESSION
     } else if (panelMode === 'session_recap' || panelMode === 'audio_session_detail') {
       height = OVERLAY_HEIGHT_SESSION_RECAP
-    } else if (panelMode === 'history' || panelMode === 'audio_sessions') {
-      height = OVERLAY_HEIGHT_EXPANDED
+    } else if (isDropdownPanel) {
+      height = hasActiveChat ? OVERLAY_HEIGHT_CHAT_EXPANDED : OVERLAY_HEIGHT_EXPANDED
+    } else if (panelMode === 'chat' || chatLoading) {
+      height = OVERLAY_HEIGHT_CHAT
     }
     void window.electronAPI.invoke('overlay:get-bounds').then((bounds) => {
       const b = bounds as { width?: number }
       const width = typeof b?.width === 'number' ? b.width : OVERLAY_MIN_WIDTH
       void window.electronAPI.invoke('overlay:set-bounds', { width, height, persist: true })
     })
-  }, [panelMode, chatLoading, needsConnect])
+  }, [panelMode, chatLoading, needsConnect, isDropdownPanel, hasActiveChat])
 
   useEffect(() => {
     syncHeight()
@@ -689,6 +956,12 @@ export default function Overlay() {
         setSuggestions([...(s as Suggestion[])])
       }
     })
+    window.electronAPI.on('sales-assist:update', (payload) => {
+      applySalesAssistPayload(payload)
+    })
+    window.electronAPI.on('sales-define:update', (payload) => {
+      applySalesDefinePayload(payload)
+    })
     window.electronAPI.on('prefs:changed', (next) => {
       setPrefs(next as PublicPreferences)
     })
@@ -710,7 +983,7 @@ export default function Overlay() {
         setTranscriptionActivity(state)
       }
     })
-  }, [])
+  }, [applySalesAssistPayload, applySalesDefinePayload])
 
   useEffect(() => {
     void window.electronAPI.invoke('prefs:load').then((data) => {
@@ -899,6 +1172,9 @@ export default function Overlay() {
     setChatStatus('')
     setChatLoading(false)
     setQuery('')
+    setViewingAudioSession(null)
+    setAudioSessionChatMessages([])
+    setAudioSessionChatStatus('')
     setPanelMode('bar')
   }, [])
 
@@ -1106,6 +1382,11 @@ export default function Overlay() {
         preferredMicrophoneId?: string
         transcriptionMode?: 'dual' | 'group'
       }
+      let transcriptionMode = audioPrefs?.transcriptionMode ?? 'dual'
+      if (prefs?.activeModeId === 'sales' && transcriptionMode !== 'dual') {
+        await window.electronAPI.invoke('audio:prefs-save', { transcriptionMode: 'dual' })
+        transcriptionMode = 'dual'
+      }
       const deviceId = audioPrefs?.preferredMicrophoneId?.trim()
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -1130,13 +1411,20 @@ export default function Overlay() {
       setFullTranscript([])
       setSuggestions([])
       setSessionInsights(null)
+      setSalesAnswer(null)
+      setSalesSuggestions([])
+      setSalesOpening([])
+      setSalesDefines([])
+      setSalesAssistError('')
       setSessionRecap(null)
       setShowLiveInsights(true)
+      setShowLiveTranscript(false)
+      setExpandedSalesAction(null)
+      setExpandedSalesDefine(null)
       setTranscriptSearch('')
       setLiveSpeakerLabels({})
       setSessionStartedAt(Date.now())
-      const prefs = audioPrefs as { transcriptionMode?: 'dual' | 'group' }
-      if (prefs.transcriptionMode) setTranscriptionMode(prefs.transcriptionMode)
+      setTranscriptionMode(transcriptionMode)
       setIsRecording(true)
       setIsPaused(false)
       isCapturingRef.current = true
@@ -1220,7 +1508,11 @@ export default function Overlay() {
 
       const storedSession: StoredAudioSession = {
         id: crypto.randomUUID(),
-        title: generateAudioSessionTitle(recap, sessionStartedAt),
+        title: generateAudioSessionTitle(
+          recap,
+          sessionStartedAt,
+          Array.isArray(transcriptEntries) ? transcriptEntries : [],
+        ),
         createdAt: sessionStartedAt ?? Date.now(),
         endedAt: Date.now(),
         transcript: Array.isArray(transcriptEntries) ? transcriptEntries : [],
@@ -1324,14 +1616,26 @@ export default function Overlay() {
     setPanelMode('bar')
   }
 
+  const closeDropdownToNewChat = useCallback(() => {
+    handleNewChat()
+  }, [handleNewChat])
+
   const toggleHistory = () => {
     if (chatLoading || audioSessionChatLoading || isRecording || isSessionRecap) return
-    setPanelMode((prev) => (prev === 'history' ? 'bar' : 'history'))
+    if (panelMode === 'history') {
+      closeDropdownToNewChat()
+      return
+    }
+    setPanelMode('history')
   }
 
   const toggleAudioSessions = () => {
     if (chatLoading || audioSessionChatLoading || isRecording || isSessionRecap) return
-    setPanelMode((prev) => (prev === 'audio_sessions' ? 'bar' : 'audio_sessions'))
+    if (panelMode === 'audio_sessions') {
+      closeDropdownToNewChat()
+      return
+    }
+    setPanelMode('audio_sessions')
   }
 
   const openAudioSession = useCallback((session: StoredAudioSession) => {
@@ -1367,20 +1671,31 @@ export default function Overlay() {
     [],
   )
 
-  const handleRenameAudioSession = async (
-    session: StoredAudioSession,
-    event: React.MouseEvent,
-  ) => {
-    event.stopPropagation()
-    const title = window.prompt('Rename audio session', session.title)
-    if (!title?.trim()) return
+  const startAudioRename = (session: StoredAudioSession, event?: React.MouseEvent) => {
+    event?.stopPropagation()
+    setAudioRenamingId(session.id)
+    setAudioRenameDraft(session.title)
+  }
+
+  const cancelAudioRename = () => {
+    setAudioRenamingId(null)
+    setAudioRenameDraft('')
+  }
+
+  const saveAudioRename = async (id: string) => {
+    const title = audioRenameDraft.trim()
+    if (!title) {
+      cancelAudioRename()
+      return
+    }
     const result = (await window.electronAPI.invoke('audio-sessions:rename', {
-      id: session.id,
-      title: title.trim(),
+      id,
+      title,
     })) as { sessions?: StoredAudioSession[] }
     if (Array.isArray(result?.sessions)) {
       setAudioSessions(result.sessions)
     }
+    cancelAudioRename()
   }
 
   const handleDeleteAudioSession = async (
@@ -1402,8 +1717,10 @@ export default function Overlay() {
     }
   }
 
+  const isSalesMode = prefs?.activeModeId === 'sales'
+
   useEffect(() => {
-    if (!isRecording || panelMode !== 'live_session') return
+    if (!isRecording || panelMode !== 'live_session' || isSalesMode) return
 
     const initialTimer = window.setTimeout(() => {
       void runSessionAnalysis()
@@ -1417,14 +1734,7 @@ export default function Overlay() {
       window.clearTimeout(initialTimer)
       window.clearInterval(interval)
     }
-  }, [isRecording, panelMode, runSessionAnalysis])
-
-  useEffect(() => {
-    if (!isRecording || panelMode !== 'live_session') return
-    if (fullTranscript.length > 0 && fullTranscript.length % 8 === 0) {
-      void runSessionAnalysis()
-    }
-  }, [fullTranscript.length, isRecording, panelMode, runSessionAnalysis])
+  }, [isRecording, panelMode, isSalesMode, runSessionAnalysis])
 
   useEffect(() => {
     if (!isLiveSession) return
@@ -1809,7 +2119,6 @@ export default function Overlay() {
           key={entry.id}
           className={`transcript-turn ${colorClass} source-${entry.source}`}
         >
-          <div className={`transcript-avatar ${colorClass}`}>{speakerInitial(speaker)}</div>
           <div className="transcript-turn-body">
             <div className="transcript-turn-header">
               <span
@@ -1836,7 +2145,142 @@ export default function Overlay() {
     })
   }
 
+  const renderTranscriptPanel = (
+    entries: TranscriptEntry[],
+    labels: SpeakerLabels = activeSpeakerLabels,
+    opts?: { showTimestamps?: boolean; allowRename?: boolean },
+  ) => {
+    if (transcriptionMode === 'dual') {
+      return renderLiveTranscriptFeed(entries)
+    }
+    return renderTranscriptLines(entries, labels, opts)
+  }
+
+  const renderSalesActionCard = (
+    action: SalesAssistAction,
+    index: number,
+    expandedIndex: number | null,
+    onToggle: (idx: number | null) => void,
+    keyPrefix: string,
+  ) => {
+    const expanded = expandedIndex === index
+    return (
+      <div key={`${keyPrefix}-${action.label}-${index}`} className="sales-action-wrap">
+        <button
+          type="button"
+          className={`live-action-row sales-action-row${expanded ? ' sales-action-row-expanded' : ''}`}
+          style={{ background: salesActionColors[action.kind] ?? salesActionColors.speak_now }}
+          onClick={() => onToggle(expanded ? null : index)}
+        >
+          <span className="suggestion-icon">{salesActionIcons[action.kind] ?? '💬'}</span>
+          <span className="suggestion-text">{action.label}</span>
+        </button>
+        {expanded ? (
+          <div className="sales-action-expanded">
+            <p className="sales-assist-speakable">{action.speakable}</p>
+            {action.context ? <p className="sales-assist-context">{action.context}</p> : null}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  const renderSalesActionsBody = () => {
+    const hasContent =
+      salesOpening.length > 0 ||
+      salesAnswer !== null ||
+      salesDefines.length > 0 ||
+      salesSuggestions.length > 0
+
+    return (
+      <>
+        {salesOpening.length > 0 && !salesAnswer ? (
+          <section className="live-section">
+            <h3 className="live-section-title">Start call</h3>
+            {salesOpening.map((action, i) =>
+              renderSalesActionCard(action, i, expandedSalesAction, setExpandedSalesAction, 'open'),
+            )}
+          </section>
+        ) : null}
+
+        <section className="live-section">
+          <h3 className="live-section-title">Answer</h3>
+          {salesAnswer ? (
+            renderSalesActionCard(
+              salesAnswer,
+              0,
+              expandedSalesAction,
+              setExpandedSalesAction,
+              'answer',
+            )
+          ) : (
+            <p className={`live-muted${salesAssistError ? ' live-assist-error' : ''}`}>
+              {salesAssistError ||
+                (fullTranscript.length === 0
+                  ? 'Listening for the call…'
+                  : 'Waiting for a question or objection…')}
+            </p>
+          )}
+        </section>
+
+        {salesDefines.length > 0 ? (
+          <section className="live-section">
+            <h3 className="live-section-title">Define</h3>
+            {salesDefines.map((entry, i) => {
+              const expanded = expandedSalesDefine === i
+              return (
+                <div key={`define-${entry.term}-${i}`} className="sales-action-wrap">
+                  <button
+                    type="button"
+                    className={`live-action-row sales-action-row sales-define-row${expanded ? ' sales-action-row-expanded' : ''}`}
+                    onClick={() => setExpandedSalesDefine(expanded ? null : i)}
+                  >
+                    <span className="suggestion-icon">📘</span>
+                    <span className="suggestion-text">Define {entry.term}</span>
+                  </button>
+                  {expanded ? (
+                    <div className="sales-action-expanded">
+                      <p className="sales-assist-speakable">{entry.speakable}</p>
+                      {entry.context ? (
+                        <p className="sales-assist-context">{entry.context}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </section>
+        ) : null}
+
+        {salesSuggestions.length > 0 ? (
+          <section className="live-section">
+            <h3 className="live-section-title">Keep going</h3>
+            {salesSuggestions.map((action, i) =>
+              renderSalesActionCard(
+                action,
+                i + 100,
+                expandedSalesAction,
+                setExpandedSalesAction,
+                'suggest',
+              ),
+            )}
+          </section>
+        ) : null}
+
+        {!hasContent && !salesAssistError ? (
+          <p className="live-muted sales-panel-hint">
+            Terms, questions, and objections will appear in separate lanes as the call unfolds.
+          </p>
+        ) : null}
+      </>
+    )
+  }
+
   const renderLiveInsightsBody = () => {
+    if (isSalesMode) {
+      return renderSalesActionsBody()
+    }
+
     const intro =
       sessionInsights?.meetingIntro?.trim() ||
       sessionInsights?.runningSummary?.trim() ||
@@ -1957,48 +2401,73 @@ export default function Overlay() {
     )
   }
 
+  const renderLiveTranscriptSection = () => (
+    <section className="live-transcript-section">
+      <div className="live-transcript-header">
+        <h3 className="live-section-title">Live Transcript</h3>
+        <span
+          className="live-transcript-meta"
+          title={
+            transcriptionMode === 'group'
+              ? 'Speakers are detected from call audio. Click a name to rename.'
+              : 'Me = your MacBook microphone. Them = system audio from the meeting.'
+          }
+        >
+          {transcriptionMode === 'group'
+            ? 'Speaker 1, 2, … = call audio'
+            : 'Me = mic · Them = call audio'}
+        </span>
+      </div>
+      <div ref={liveTranscriptRef} className="live-transcript-panel live-transcript-primary">
+        {renderTranscriptPanel(fullTranscript, activeSpeakerLabels, { showTimestamps: true })}
+      </div>
+    </section>
+  )
+
   const renderLiveSessionPanel = () => (
     <div className="live-session-panel" ref={livePanelRef}>
       <div className="live-session-header">
-        <span className="live-session-title">Live Insights</span>
+        <span className="live-session-title">
+          {isSalesMode ? 'Sales Assist' : 'Live Insights'}
+        </span>
         <div className="live-session-header-actions">
-          {insightsLoading && <span className="live-analyzing">Analyzing…</span>}
-          <button
-            type="button"
-            className={`live-transcript-toggle ${showLiveInsights ? 'active' : ''}`}
-            onClick={() => setShowLiveInsights((v) => !v)}
-          >
-            <span className="live-wave-icon">〰</span>
-            {showLiveInsights ? 'Hide analysis' : 'Show analysis'}
-          </button>
+          {insightsLoading && (
+            <span className="live-analyzing">{isSalesMode ? 'Assisting…' : 'Analyzing…'}</span>
+          )}
+          {isSalesMode ? (
+            <button
+              type="button"
+              className={`live-transcript-toggle ${showLiveTranscript ? 'active' : ''}`}
+              onClick={() => setShowLiveTranscript((v) => !v)}
+            >
+              <span className="live-wave-icon">〰</span>
+              {showLiveTranscript ? 'Hide Transcript' : 'Show Transcript'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`live-transcript-toggle ${showLiveInsights ? 'active' : ''}`}
+              onClick={() => setShowLiveInsights((v) => !v)}
+            >
+              <span className="live-wave-icon">〰</span>
+              {showLiveInsights ? 'Hide analysis' : 'Show analysis'}
+            </button>
+          )}
         </div>
       </div>
 
       <div className="live-session-body">
-        <section className="live-transcript-section">
-          <div className="live-transcript-header">
-            <h3 className="live-section-title">Live Transcript</h3>
-            <span
-              className="live-transcript-meta"
-              title={
-                transcriptionMode === 'group'
-                  ? 'Speakers are detected from call audio. Click a name to rename.'
-                  : 'Me = your MacBook microphone. Them = system audio from the meeting.'
-              }
-            >
-              {transcriptionMode === 'group'
-                ? 'Speaker 1, 2, … = call audio'
-                : 'Me = mic · Them = call audio'}
-            </span>
-          </div>
-          <div ref={liveTranscriptRef} className="live-transcript-panel live-transcript-primary">
-            {transcriptionMode === 'dual'
-              ? renderLiveTranscriptFeed(fullTranscript)
-              : renderTranscriptLines(fullTranscript, activeSpeakerLabels, { showTimestamps: true })}
-          </div>
-        </section>
-
-        {showLiveInsights ? renderLiveInsightsBody() : null}
+        {isSalesMode ? (
+          <>
+            {renderSalesActionsBody()}
+            {showLiveTranscript ? renderLiveTranscriptSection() : null}
+          </>
+        ) : (
+          <>
+            {renderLiveTranscriptSection()}
+            {showLiveInsights ? renderLiveInsightsBody() : null}
+          </>
+        )}
       </div>
 
       <button type="button" className="live-session-footer" onClick={focusSessionInput}>
@@ -2059,6 +2528,25 @@ export default function Overlay() {
     const participants = collectParticipants(transcript, speakerLabels)
     const discussionPoints = recapDiscussionPoints(recap)
     const decisions = recapDecisions(recap)
+    const salesRecap = isSalesRecap(recap)
+    const followUpEmail = recap.prospectFollowUpEmail?.trim() || recap.recapEmailDraft?.trim()
+
+    const renderObjectionsSection = () => {
+      if (!recap.objectionsRaised?.length) return null
+      return (
+        <section className="recap-section">
+          <h2 className="recap-section-heading">Objections</h2>
+          <div className="recap-section-body">
+            {recap.objectionsRaised.map((obj, i) => (
+              <p key={i} className="recap-line">
+                <strong>{obj.type}:</strong> {obj.summary}
+                {obj.handled ? ` — ${obj.handled}` : ''}
+              </p>
+            ))}
+          </div>
+        </section>
+      )
+    }
 
     return (
       <div className="recap-document">
@@ -2103,7 +2591,7 @@ export default function Overlay() {
           {recap.summary && (
             <div className="recap-summary-block">
               <div className="recap-summary-header">
-                <span className="recap-label">SUMMARY</span>
+                <span className="recap-label">{salesRecap ? 'CALL SUMMARY' : 'SUMMARY'}</span>
                 <button
                   type="button"
                   className="recap-copy-btn"
@@ -2129,17 +2617,48 @@ export default function Overlay() {
             </div>
           )}
 
+          {recap.dealSummary ? (
+            <section className="recap-section">
+              <h2 className="recap-section-heading">Deal summary</h2>
+              <div className="recap-section-body">
+                <p className="recap-line">{recap.dealSummary}</p>
+              </div>
+            </section>
+          ) : null}
+
+          {renderRecapSection('Pain points uncovered', recap.painPointsUncovered ?? [], 'pains')}
+          {renderRecapSection('Buying signals', recap.buyingSignals ?? [], 'buying')}
+          {renderObjectionsSection()}
+          {renderRecapSection('Competitors mentioned', recap.competitorsMentioned ?? [], 'competitors')}
+          {renderRecapSection('Budget & timeline', recap.budgetTimelineSignals ?? [], 'budget')}
+          {renderRecapSection('Stakeholders', recap.stakeholderMap ?? [], 'stakeholders')}
+          {renderRecapSection('Risk flags', recap.riskFlags ?? [], 'risks')}
+          {renderRecapSection(
+            'Mutual action plan',
+            recap.mutualActionPlan ?? [],
+            'map',
+          )}
           {renderRecapSection('Action Items', recap.actionItems, 'action-items')}
-          {renderRecapSection('Discussion Points', discussionPoints, 'discussion')}
+          {renderRecapSection('Next call agenda', recap.nextCallAgenda ?? [], 'next-agenda')}
+          {!salesRecap && renderRecapSection('Discussion Points', discussionPoints, 'discussion')}
           {renderRecapSection('Decisions / Agreements', decisions, 'decisions')}
           {renderRecapSection('Open Questions', recap.openQuestions, 'open-questions')}
 
-          {recap.recapEmailDraft && (
+          {followUpEmail ? (
             <section className="recap-section recap-email-section">
-              <h2 className="recap-section-heading">Recap email draft</h2>
-              <pre className="live-email-draft">{recap.recapEmailDraft}</pre>
+              <h2 className="recap-section-heading">
+                {salesRecap ? 'Prospect follow-up email' : 'Recap email draft'}
+              </h2>
+              <pre className="live-email-draft">{followUpEmail}</pre>
             </section>
-          )}
+          ) : null}
+
+          {recap.internalCrmNote ? (
+            <section className="recap-section recap-email-section">
+              <h2 className="recap-section-heading">Internal CRM note</h2>
+              <pre className="live-email-draft">{recap.internalCrmNote}</pre>
+            </section>
+          ) : null}
 
           {transcript.length > 0 && (
             <section className="recap-section recap-transcript-section">
@@ -2154,7 +2673,7 @@ export default function Overlay() {
                 />
               )}
               <div className="live-transcript-panel recap-transcript">
-                {renderTranscriptLines(filtered, speakerLabels)}
+                {renderTranscriptPanel(filtered, speakerLabels)}
               </div>
             </section>
           )}
@@ -2170,7 +2689,7 @@ export default function Overlay() {
           <div className="overlay-empty">Generating recap…</div>
         ) : sessionRecap ? (
           renderRecapDocument({
-            title: generateAudioSessionTitle(sessionRecap, sessionStartedAt),
+            title: generateAudioSessionTitle(sessionRecap, sessionStartedAt, fullTranscript),
             date: sessionStartedAt ?? Date.now(),
             transcript: fullTranscript,
             recap: sessionRecap,
@@ -2187,6 +2706,172 @@ export default function Overlay() {
           <div className="overlay-empty">Session ended — no transcript captured</div>
         )}
       </div>
+    </div>
+  )
+
+  const renderAudioSessionsDropdown = (inChatPanel = false) => (
+    <div
+      className={`overlay-expanded overlay-expanded-history${inChatPanel ? ' overlay-expanded-in-chat' : ''}`}
+    >
+      <div className="expanded-section">
+        <div className="expanded-label">Audio sessions</div>
+        {audioSessions.length === 0 ? (
+          <div className="overlay-empty">No audio sessions yet — start one with the audio button</div>
+        ) : (
+          audioSessions.map((session) => (
+            <div key={session.id} className="history-session-row audio-session-row">
+              {audioRenamingId === session.id ? (
+                <div className="audio-session-row-rename">
+                  <input
+                    className="audio-session-rename-input"
+                    value={audioRenameDraft}
+                    onChange={(e) => setAudioRenameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void saveAudioRename(session.id)
+                      if (e.key === 'Escape') cancelAudioRename()
+                    }}
+                    autoFocus
+                  />
+                  <div className="audio-session-rename-actions">
+                    <button
+                      type="button"
+                      className="audio-session-rename-btn primary"
+                      onClick={() => void saveAudioRename(session.id)}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="audio-session-rename-btn"
+                      onClick={cancelAudioRename}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="audio-session-row-open"
+                    onClick={() => openAudioSession(session)}
+                  >
+                    <span className="history-session-title">{session.title}</span>
+                    <span className="history-session-meta">
+                      <span className="history-session-time">
+                        {formatRelativeTime(session.createdAt)}
+                      </span>
+                      <span className="history-session-badge">Open</span>
+                    </span>
+                  </button>
+                  <div className="audio-session-row-actions">
+                    <button
+                      type="button"
+                      className="audio-session-action-btn"
+                      onClick={(e) => startAudioRename(session, e)}
+                      aria-label="Rename"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="audio-session-action-btn audio-session-action-delete"
+                      onClick={(e) => void handleDeleteAudioSession(session, e)}
+                      aria-label="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+
+  const renderHistoryDropdown = (inChatPanel = false) => (
+    <div
+      className={`overlay-expanded overlay-expanded-history${inChatPanel ? ' overlay-expanded-in-chat' : ''}`}
+    >
+      {status && <div className="overlay-status">{status}</div>}
+
+      {activeChatSessions.length > 0 && (
+        <div className="expanded-section">
+          <div className="expanded-label">Chats</div>
+          {hasActiveChat && panelMode === 'history' && (
+            <button type="button" className="history-continue-btn" onClick={reopenChat}>
+              Continue chat
+            </button>
+          )}
+          {recentChatSessions.map((session) => {
+            const isActive = session.id === activeSessionId
+            return (
+              <button
+                key={session.id}
+                type="button"
+                className={`history-session-row ${isActive ? 'history-session-row--active' : ''}`}
+                onClick={() => loadSession(session)}
+              >
+                <span className="history-session-title">{session.title}</span>
+                <span className="history-session-meta">
+                  <span className="history-session-time">
+                    {formatRelativeTime(session.createdAt)}
+                  </span>
+                  <span
+                    className={`history-session-badge ${isActive ? 'history-session-badge--active' : ''}`}
+                  >
+                    {isActive ? 'Active' : 'Resume'}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+          {(hasMoreChatHistory || activeChatSessions.length > 0) && (
+            <button type="button" className="history-view-all-btn" onClick={openFullHistory}>
+              View full history
+            </button>
+          )}
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <div className="expanded-section">
+          <div className="expanded-label">Suggestions</div>
+          {suggestions.map((s, i) => (
+            <div
+              key={i}
+              className="overlay-suggestion"
+              style={{ background: typeColors[s.type] }}
+            >
+              <span className="suggestion-icon">{typeLabels[s.type]}</span>
+              <span className="suggestion-text">{s.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {transcript.length > 0 && (
+        <div className="expanded-section">
+          <div className="expanded-label">Transcript</div>
+          {renderTranscriptPanel(transcript.slice(-15))}
+        </div>
+      )}
+
+      {isRecording &&
+        suggestions.length === 0 &&
+        transcript.length === 0 &&
+        chatMessages.length === 0 &&
+        allChatSessions.length === 0 && (
+          <div className="overlay-empty">
+            {status === 'Transcribing...' ? 'Transcribing...' : 'Listening... speak now'}
+          </div>
+        )}
+
+      {!isRecording && !hasAnyHistory && (
+        <div className="overlay-empty">No history yet</div>
+      )}
     </div>
   )
 
@@ -2425,7 +3110,7 @@ export default function Overlay() {
                       <section className="recap-section recap-transcript-section">
                         <h2 className="recap-section-heading">Full transcript</h2>
                         <div className="live-transcript-panel recap-transcript">
-                          {renderTranscriptLines(
+                          {renderTranscriptPanel(
                             viewingAudioSession.transcript,
                             viewingAudioSession.speakerLabels ?? {},
                           )}
@@ -2469,6 +3154,9 @@ export default function Overlay() {
           )}
 
           {renderToolbar()}
+
+          {panelMode === 'audio_sessions' && renderAudioSessionsDropdown(true)}
+          {panelMode === 'history' && renderHistoryDropdown(true)}
         </div>
       </div>
     )
@@ -2536,136 +3224,8 @@ export default function Overlay() {
       {isLiveSession && renderLiveSessionPanel()}
       {isSessionRecap && renderSessionRecapPanel()}
 
-      {isExpanded && panelMode === 'audio_sessions' && (
-        <div className="overlay-expanded overlay-expanded-history">
-          <div className="expanded-section">
-            <div className="expanded-label">Audio sessions</div>
-            {audioSessions.length === 0 ? (
-              <div className="overlay-empty">No audio sessions yet — start one with the audio button</div>
-            ) : (
-              audioSessions.map((session) => (
-                <div key={session.id} className="history-session-row audio-session-row">
-                  <button
-                    type="button"
-                    className="audio-session-row-open"
-                    onClick={() => openAudioSession(session)}
-                  >
-                    <span className="history-session-title">{session.title}</span>
-                    <span className="history-session-meta">
-                      <span className="history-session-time">
-                        {formatRelativeTime(session.createdAt)}
-                      </span>
-                      <span className="history-session-badge">Open</span>
-                    </span>
-                  </button>
-                  <div className="audio-session-row-actions">
-                    <button
-                      type="button"
-                      className="audio-session-action-btn"
-                      onClick={(e) => void handleRenameAudioSession(session, e)}
-                      aria-label="Rename"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="audio-session-action-btn audio-session-action-delete"
-                      onClick={(e) => void handleDeleteAudioSession(session, e)}
-                      aria-label="Delete"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {isExpanded && panelMode === 'history' && (
-        <div className="overlay-expanded overlay-expanded-history">
-          {status && <div className="overlay-status">{status}</div>}
-
-          {activeChatSessions.length > 0 && (
-            <div className="expanded-section">
-              <div className="expanded-label">Chats</div>
-              {hasActiveChat && panelMode === 'history' && (
-                <button
-                  type="button"
-                  className="history-continue-btn"
-                  onClick={reopenChat}
-                >
-                  Continue chat
-                </button>
-              )}
-              {recentChatSessions.map((session) => {
-                const isActive = session.id === activeSessionId
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    className={`history-session-row ${isActive ? 'history-session-row--active' : ''}`}
-                    onClick={() => loadSession(session)}
-                  >
-                    <span className="history-session-title">{session.title}</span>
-                    <span className="history-session-meta">
-                      <span className="history-session-time">
-                        {formatRelativeTime(session.createdAt)}
-                      </span>
-                      <span className={`history-session-badge ${isActive ? 'history-session-badge--active' : ''}`}>
-                        {isActive ? 'Active' : 'Resume'}
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
-              {(hasMoreChatHistory || activeChatSessions.length > 0) && (
-                <button type="button" className="history-view-all-btn" onClick={openFullHistory}>
-                  View full history
-                </button>
-              )}
-            </div>
-          )}
-
-          {suggestions.length > 0 && (
-            <div className="expanded-section">
-              <div className="expanded-label">Suggestions</div>
-              {suggestions.map((s, i) => (
-                <div
-                  key={i}
-                  className="overlay-suggestion"
-                  style={{ background: typeColors[s.type] }}
-                >
-                  <span className="suggestion-icon">{typeLabels[s.type]}</span>
-                  <span className="suggestion-text">{s.text}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {transcript.length > 0 && (
-            <div className="expanded-section">
-              <div className="expanded-label">Transcript</div>
-              {renderTranscriptLines(transcript.slice(-15))}
-            </div>
-          )}
-
-          {isRecording &&
-            suggestions.length === 0 &&
-            transcript.length === 0 &&
-            chatMessages.length === 0 &&
-            allChatSessions.length === 0 && (
-            <div className="overlay-empty">
-              {status === 'Transcribing...' ? 'Transcribing...' : 'Listening... speak now'}
-            </div>
-          )}
-
-          {!isRecording && !hasAnyHistory && (
-            <div className="overlay-empty">No history yet</div>
-          )}
-        </div>
-      )}
+      {isExpanded && panelMode === 'audio_sessions' && !hasActiveChat && renderAudioSessionsDropdown()}
+      {isExpanded && panelMode === 'history' && !hasActiveChat && renderHistoryDropdown()}
     </div>
   )
 }

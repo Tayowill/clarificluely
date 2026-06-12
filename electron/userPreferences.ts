@@ -39,6 +39,8 @@ export type UserPreferences = {
   activeModeId: string
   modes: ModeConfig[]
   showModelInToolbar: boolean
+  /** Optional product/battlecard knowledge for Sales mode live assist and recaps */
+  productKnowledge?: string
 }
 
 export type PublicModelConfig = Omit<ModelConfig, never>
@@ -48,6 +50,7 @@ export type PublicPreferences = {
   activeModeId: string
   modes: ModeConfig[]
   showModelInToolbar: boolean
+  productKnowledge: string
 }
 
 const PREFS_FILE = 'user-preferences.json'
@@ -70,6 +73,7 @@ function defaultPreferences(): UserPreferences {
     activeModeId: 'general',
     modes: DEFAULT_MODES.map((m) => ({ ...m })),
     showModelInToolbar: false,
+    productKnowledge: '',
   }
 }
 
@@ -77,21 +81,13 @@ let cached: UserPreferences | null = null
 
 function mergeModes(stored: ModeConfig[]): ModeConfig[] {
   const byId = new Map(stored.map((m) => [m.id, m]))
-  const merged = DEFAULT_MODES.map((defaults) => {
+  return DEFAULT_MODES.map((defaults) => {
     const existing = byId.get(defaults.id)
     return {
       ...defaults,
       isActive: existing?.isActive ?? defaults.isActive,
     }
   })
-  for (const mode of stored) {
-    if (isBuiltinModeId(mode.id)) continue
-    merged.push({
-      ...mode,
-      builtin: false,
-    })
-  }
-  return merged
 }
 
 function mergeModels(stored: ModelConfig[]): ModelConfig[] {
@@ -132,6 +128,8 @@ export function loadUserPreferences(): UserPreferences {
         typeof parsed.showModelInToolbar === 'boolean'
           ? parsed.showModelInToolbar
           : defaults.showModelInToolbar,
+      productKnowledge:
+        typeof parsed.productKnowledge === 'string' ? parsed.productKnowledge : '',
     }
     syncActiveModeFlag(cached)
     return cached
@@ -172,7 +170,20 @@ export function toPublicPreferences(prefs: UserPreferences): PublicPreferences {
     activeModeId: prefs.activeModeId,
     modes: prefs.modes.map((m) => ({ ...m })),
     showModelInToolbar: prefs.showModelInToolbar,
+    productKnowledge: prefs.productKnowledge?.trim() ?? '',
   }
+}
+
+export function getProductKnowledge(prefs = loadUserPreferences()): string {
+  return prefs.productKnowledge?.trim() ?? ''
+}
+
+export function setProductKnowledge(knowledge: string): PublicPreferences {
+  const prefs = loadUserPreferences()
+  const trimmed = knowledge.trim()
+  prefs.productKnowledge = trimmed.slice(0, 80_000)
+  saveUserPreferences(prefs)
+  return toPublicPreferences(prefs)
 }
 
 export function getActiveModel(prefs = loadUserPreferences()): ModelConfig {

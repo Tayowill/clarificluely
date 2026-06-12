@@ -139,6 +139,17 @@ export function getDefaultPosition(width: number, height: number): OverlayPositi
   return getTopCenterPosition(primary, width, height)
 }
 
+/** Move overlay to top-center of the display under the cursor (or primary). */
+export function repositionOverlayToTopCenter(window: BrowserWindow): void {
+  if (window.isDestroyed()) return
+  const { width, height } = window.getBounds()
+  const cursor = screen.getCursorScreenPoint()
+  const display = screen.getDisplayNearestPoint(cursor)
+  const pos = getTopCenterPosition(display, width, height)
+  setOverlayBounds(window, pos.x, pos.y, width, height, true)
+  saveOverlayPosition(pos.x, pos.y)
+}
+
 export function clampPosition(
   x: number,
   y: number,

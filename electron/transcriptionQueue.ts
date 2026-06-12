@@ -38,7 +38,7 @@ let processingSystem = false
 let draining = false
 let options: TranscriptionQueueOptions | null = null
 
-const SYSTEM_FIRST_WAIT_MS = 12_000
+const SYSTEM_FIRST_WAIT_MS = 2_500
 const MIC_BLEED_WINDOW_MS = 25_000
 const ACTIVITY_SILENCE_MS = 6000
 
@@ -113,7 +113,7 @@ export function enqueueTranscription(
   const chunk: QueuedChunk = { base64, source, enqueuedAt: Date.now(), rms }
   if (source === 'mic') {
     queueMic.push(chunk)
-    void drainSystemQueue().then(() => drainMicQueue())
+    void drainMicQueue()
   } else {
     recentSystemChunks.push({ at: chunk.enqueuedAt, rms: 0, hadEnergy: false })
     if (recentSystemChunks.length > 24) {

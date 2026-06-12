@@ -802,6 +802,14 @@ body {
   max-height: 280px;
 }
 
+.overlay-expanded-in-chat {
+  margin: 0 10px 10px;
+  flex-shrink: 0;
+  max-height: 180px;
+  border-radius: 0 0 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .history-session-row {
   display: flex;
   align-items: center;
@@ -1091,6 +1099,10 @@ body {
   color: rgba(255, 255, 255, 0.4);
 }
 
+.live-assist-error {
+  color: rgba(251, 146, 60, 0.95);
+}
+
 .live-action-row {
   display: flex;
   align-items: flex-start;
@@ -1193,6 +1205,100 @@ body {
   color: rgba(255, 255, 255, 0.85);
 }
 
+.sales-action-wrap {
+  margin-bottom: 4px;
+}
+
+.sales-action-row {
+  width: 100%;
+  text-align: left;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.sales-action-row:hover {
+  filter: brightness(1.08);
+}
+
+.sales-action-row-expanded {
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 0;
+}
+
+.sales-action-expanded {
+  padding: 10px 12px 12px 36px;
+  margin-bottom: 4px;
+  border-radius: 0 0 8px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: none;
+}
+
+.sales-assist-card {
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sales-assist-card-primary {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.sales-assist-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sales-assist-kind {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.sales-assist-headline {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.sales-assist-speakable {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+}
+
+.sales-assist-context {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 8px 0 0;
+}
+
+.sales-define-row {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.sales-panel-hint {
+  margin: 0 0 8px;
+  padding: 0 2px;
+}
+
+.sales-stage-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
 .live-time-warning {
   font-size: 11px;
   color: #fbbf24;
@@ -1256,7 +1362,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .transcript-feed-time {
@@ -1279,14 +1385,15 @@ body {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.45);
-  margin-bottom: 3px;
+  margin-bottom: 8px;
 }
 
 .transcript-feed-text {
   display: block;
   font-size: 13px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .transcript-feed-status {
@@ -1324,8 +1431,7 @@ body {
 .transcript-turn {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .transcript-avatar {
@@ -1350,7 +1456,7 @@ body {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
 }
 
 .transcript-speaker {
@@ -1366,9 +1472,10 @@ body {
 
 .transcript-text {
   display: block;
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .speaker-me .transcript-avatar,
@@ -1720,6 +1827,51 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.audio-session-row-rename {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.audio-session-rename-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.audio-session-rename-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.audio-session-rename-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.audio-session-rename-btn.primary {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.25);
+  color: #fff;
 }
 
 .audio-session-action-btn {

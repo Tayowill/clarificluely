@@ -19,6 +19,7 @@ import {
   isOverlayFollowEnabled,
   setContentProtectionEnabled,
   getOverlaySize,
+  markOverlayReady,
   setOverlayHeight,
   setOverlayInteractive,
   setOverlaySize,
@@ -31,12 +32,29 @@ import {
   analyzeLiveSession,
   chatWithMeetingContext,
   chatWithStoredAudioSession,
+  generateSalesAnswerAssist,
+  generateSalesSuggestionAssist,
+  generateSalesTermDefine,
+  getCachedSalesDefines,
+  getSalesCallOpeningActions,
+  hasStickySalesAnswer,
+  isSalesAssistInFlight,
   generateSessionRecap,
   generateSuggestions,
   inferSpeakerLabels,
   resetSuggestionState,
+  type SalesAssistError,
+  type SalesDefinePayload,
+  type SalesPanelBroadcast,
+  type SalesPanelPayload,
   type SessionRecap,
 } from '../llm'
+import {
+  extractAllJargonTerms,
+  isCallOpeningWindow,
+  prospectUtteranceJustCompleted,
+  salesTailNeedsFastAnswer,
+} from '../salesAssistTrigger'
 import {
   deleteAudioSession,
   getAudioSessionById,
@@ -135,11 +153,13 @@ import { normalizeSettingsTab, openSettingsWindow } from '../settings'
 import {
   addCustomModel,
   createMode,
+  getActiveMode,
   loadUserPreferences,
   removeCustomMode,
   removeCustomModel,
   setActiveMode,
   setActiveModel,
+  setProductKnowledge,
   setShowModelInToolbar,
   toPublicPreferences,
   type ModelProvider,
@@ -155,6 +175,33 @@ const MAX_STRING_LENGTH = 50_000
 const HTML_TAG_REGEX = /<[^>]*>/g
 
 const LLM_RATE_LIMIT = { max: 10, windowMs: 60_000 }
+const SALES_ASSIST_RATE_LIMIT = { max: 30, windowMs: 60_000 }
+const SALES_ANSWER_DEBOUNCE_MS = 2_500
+const SALES_ANSWER_FAST_DEBOUNCE_MS = 800
+const SALES_ANSWER_MIN_INTERVAL_MS = 2_000
+const SALES_ANSWER_FAST_MIN_INTERVAL_MS = 1_200
+const SALES_SUGGEST_DEBOUNCE_MS = 1_200
+const SALES_SUGGEST_FAST_DEBOUNCE_MS = 600
+const SALES_SUGGEST_MIN_INTERVAL_MS = 2_000
+const SALES_SUGGEST_FAST_MIN_INTERVAL_MS = 1_200
+const SALES_DEFINE_DEBOUNCE_MS = 1_200
+const SALES_DEFINE_MIN_INTERVAL_MS = 1_500
+
+let lastSalesAnswerRunAt = 0
+let lastSalesSuggestRunAt = 0
+let lastSalesDefineRunAt = 0
+let salesAnswerDirty = false
+let salesSuggestDirty = false
+let salesDefineDirty = false
+let salesAnswerInFlight = false
+let salesSuggestInFlight = false
+let salesDefineInFlight = false
+let salesAnswerDebounceTimer: NodeJS.Timeout | null = null
+let salesSuggestDebounceTimer: NodeJS.Timeout | null = null
+let salesDefineDebounceTimer: NodeJS.Timeout | null = null
+let salesSessionStartedAt: number | null = null
+let salesCallOpeningActive = false
+let stickySalesPanel: SalesPanelBroadcast = {}
 
 type RateLimitBucket = {
   count: number
@@ -245,7 +292,10 @@ function registerValidatedHandler(
         options.rateLimit.windowMs,
       )
       if (!allowed) {
-        return { error: 'rate_limit_exceeded' }
+        return {
+          error: 'rate_limit_exceeded',
+          message: 'Assist is updating too quickly — wait a few seconds.',
+        }
       }
     }
 
@@ -318,15 +368,247 @@ async function queryAnthropic(prompt: string, apiKey: string): Promise<unknown> 
   }
 }
 
-async function updateSuggestionsForOverlay(
-  lines: string[],
-): Promise<void> {
+function resetSalesAssistScheduler(): void {
+  salesAnswerDirty = false
+  salesSuggestDirty = false
+  salesDefineDirty = false
+  salesSessionStartedAt = null
+  salesCallOpeningActive = false
+  stickySalesPanel = {}
+  for (const timer of [
+    salesAnswerDebounceTimer,
+    salesSuggestDebounceTimer,
+    salesDefineDebounceTimer,
+  ]) {
+    if (timer) clearTimeout(timer)
+  }
+  salesAnswerDebounceTimer = null
+  salesSuggestDebounceTimer = null
+  salesDefineDebounceTimer = null
+}
+
+function broadcastSalesPanelUpdate(patch: Partial<SalesPanelBroadcast>): void {
+  if (patch.error) {
+    stickySalesPanel = { ...stickySalesPanel, error: patch.error }
+  } else {
+    stickySalesPanel = {
+      answer: patch.answer !== undefined ? patch.answer : stickySalesPanel.answer,
+      suggestions:
+        patch.suggestions !== undefined ? patch.suggestions : stickySalesPanel.suggestions,
+      opening: patch.opening !== undefined ? patch.opening : stickySalesPanel.opening,
+      error: stickySalesPanel.error,
+    }
+    if (patch.answer !== undefined || patch.suggestions !== undefined || patch.opening !== undefined) {
+      delete stickySalesPanel.error
+    }
+  }
+
+  const overlay = getOverlayWindow()
+  if (!overlay || overlay.isDestroyed()) return
+  overlay.webContents.send('sales-assist:update', stickySalesPanel)
+}
+
+function broadcastSalesDefineUpdate(): void {
+  const overlay = getOverlayWindow()
+  if (!overlay || overlay.isDestroyed()) return
+  const payload: SalesDefinePayload = { defines: getCachedSalesDefines() }
+  overlay.webContents.send('sales-define:update', payload)
+}
+
+function maybeUpdateCallOpening(): void {
+  if (!salesCallOpeningActive) return
+  const lines = getSessionTranscript()
+  const showOpening = isCallOpeningWindow(
+    lines.length,
+    hasStickySalesAnswer(),
+    salesSessionStartedAt,
+  )
+  if (!showOpening) {
+    salesCallOpeningActive = false
+    broadcastSalesPanelUpdate({ opening: null })
+    return
+  }
+  broadcastSalesPanelUpdate({ opening: getSalesCallOpeningActions() })
+}
+
+async function flushSalesAnswerUpdate(): Promise<void> {
+  if (getActiveMode().id !== 'sales') return
+  if (!salesAnswerDirty) return
+
+  const lines = getSessionTranscript()
+  const fast = salesTailNeedsFastAnswer(lines)
+  const debounceMs = fast ? SALES_ANSWER_FAST_DEBOUNCE_MS : SALES_ANSWER_DEBOUNCE_MS
+  const minInterval = fast ? SALES_ANSWER_FAST_MIN_INTERVAL_MS : SALES_ANSWER_MIN_INTERVAL_MS
+  const now = Date.now()
+
+  if (salesAnswerInFlight) {
+    salesAnswerDebounceTimer = setTimeout(() => void flushSalesAnswerUpdate(), debounceMs)
+    return
+  }
+  if (now - lastSalesAnswerRunAt < minInterval) {
+    salesAnswerDebounceTimer = setTimeout(
+      () => void flushSalesAnswerUpdate(),
+      minInterval - (now - lastSalesAnswerRunAt),
+    )
+    return
+  }
+
+  salesAnswerDirty = false
+  salesAnswerInFlight = true
+  lastSalesAnswerRunAt = now
+
+  try {
+    const result = await generateSalesAnswerAssist(lines)
+    if (result === null && isSalesAssistInFlight()) {
+      salesAnswerDirty = true
+      return
+    }
+    if (result?.error) {
+      broadcastSalesPanelUpdate({ error: result.error })
+      return
+    }
+    if (result?.answer) {
+      salesCallOpeningActive = false
+      broadcastSalesPanelUpdate({ answer: result.answer, opening: null })
+    }
+  } finally {
+    salesAnswerInFlight = false
+    maybeUpdateCallOpening()
+    if (salesAnswerDirty) scheduleSalesAnswerUpdate()
+  }
+}
+
+async function flushSalesSuggestUpdate(): Promise<void> {
+  if (getActiveMode().id !== 'sales') return
+  if (!salesSuggestDirty) return
+
+  const lines = getSessionTranscript()
+  const fast = prospectUtteranceJustCompleted(lines.slice(-30))
+  const debounceMs = fast ? SALES_SUGGEST_FAST_DEBOUNCE_MS : SALES_SUGGEST_DEBOUNCE_MS
+  const minInterval = fast ? SALES_SUGGEST_FAST_MIN_INTERVAL_MS : SALES_SUGGEST_MIN_INTERVAL_MS
+  const now = Date.now()
+
+  if (salesSuggestInFlight) {
+    salesSuggestDebounceTimer = setTimeout(() => void flushSalesSuggestUpdate(), debounceMs)
+    return
+  }
+  if (now - lastSalesSuggestRunAt < minInterval) {
+    salesSuggestDebounceTimer = setTimeout(
+      () => void flushSalesSuggestUpdate(),
+      minInterval - (now - lastSalesSuggestRunAt),
+    )
+    return
+  }
+
+  salesSuggestDirty = false
+  salesSuggestInFlight = true
+  lastSalesSuggestRunAt = now
+
+  try {
+    const result = await generateSalesSuggestionAssist(getSessionTranscript())
+    if (result === null && isSalesAssistInFlight()) {
+      salesSuggestDirty = true
+      return
+    }
+    if (result?.suggestions?.length) {
+      broadcastSalesPanelUpdate({ suggestions: result.suggestions })
+    }
+  } finally {
+    salesSuggestInFlight = false
+    if (salesSuggestDirty) scheduleSalesSuggestUpdate()
+  }
+}
+
+async function flushSalesDefineUpdate(): Promise<void> {
+  if (getActiveMode().id !== 'sales') return
+  if (!salesDefineDirty) return
+
+  const now = Date.now()
+  if (salesDefineInFlight) {
+    salesDefineDebounceTimer = setTimeout(() => void flushSalesDefineUpdate(), SALES_DEFINE_DEBOUNCE_MS)
+    return
+  }
+  if (now - lastSalesDefineRunAt < SALES_DEFINE_MIN_INTERVAL_MS) {
+    salesDefineDebounceTimer = setTimeout(
+      () => void flushSalesDefineUpdate(),
+      SALES_DEFINE_MIN_INTERVAL_MS - (now - lastSalesDefineRunAt),
+    )
+    return
+  }
+
+  salesDefineDirty = false
+  salesDefineInFlight = true
+  lastSalesDefineRunAt = now
+
+  try {
+    const lines = getSessionTranscript()
+    const tailLines = lines.slice(-30)
+    const terms = extractAllJargonTerms(tailLines)
+    const cached = new Set(getCachedSalesDefines().map((entry) => entry.term.toLowerCase()))
+    const pending = terms.filter((term) => !cached.has(term.toLowerCase())).slice(-1)
+
+    for (const term of pending) {
+      const entry = await generateSalesTermDefine(term, lines)
+      if (entry) broadcastSalesDefineUpdate()
+    }
+  } finally {
+    salesDefineInFlight = false
+    if (salesDefineDirty) scheduleSalesDefineUpdate()
+  }
+}
+
+function scheduleSalesAnswerUpdate(): void {
+  if (getActiveMode().id !== 'sales') return
+  salesAnswerDirty = true
+  const lines = getSessionTranscript()
+  const debounceMs = salesTailNeedsFastAnswer(lines.slice(-30))
+    ? SALES_ANSWER_FAST_DEBOUNCE_MS
+    : SALES_ANSWER_DEBOUNCE_MS
+  if (salesAnswerDebounceTimer) clearTimeout(salesAnswerDebounceTimer)
+  salesAnswerDebounceTimer = setTimeout(() => void flushSalesAnswerUpdate(), debounceMs)
+}
+
+function scheduleSalesSuggestUpdate(): void {
+  if (getActiveMode().id !== 'sales') return
+  salesSuggestDirty = true
+  const lines = getSessionTranscript()
+  const debounceMs = prospectUtteranceJustCompleted(lines.slice(-30))
+    ? SALES_SUGGEST_FAST_DEBOUNCE_MS
+    : SALES_SUGGEST_DEBOUNCE_MS
+  if (salesSuggestDebounceTimer) clearTimeout(salesSuggestDebounceTimer)
+  salesSuggestDebounceTimer = setTimeout(() => void flushSalesSuggestUpdate(), debounceMs)
+}
+
+function scheduleSalesDefineUpdate(): void {
+  if (getActiveMode().id !== 'sales') return
+  salesDefineDirty = true
+  if (salesDefineDebounceTimer) clearTimeout(salesDefineDebounceTimer)
+  salesDefineDebounceTimer = setTimeout(() => void flushSalesDefineUpdate(), SALES_DEFINE_DEBOUNCE_MS)
+}
+
+function scheduleSalesPanelUpdates(): void {
+  maybeUpdateCallOpening()
+  scheduleSalesAnswerUpdate()
+  scheduleSalesSuggestUpdate()
+  scheduleSalesDefineUpdate()
+}
+
+async function updateLiveAssistForOverlay(lines: string[]): Promise<void> {
+  const overlay = getOverlayWindow()
+  if (!overlay || overlay.isDestroyed()) return
+
+  const isSales = getActiveMode().id === 'sales'
+
+  if (isSales) {
+    scheduleSalesPanelUpdates()
+    return
+  }
+
   suggestionCounter += 1
   if (suggestionCounter % 2 !== 0) return
 
   const suggestions = await generateSuggestions(lines)
-  const overlay = getOverlayWindow()
-  if (overlay && !overlay.isDestroyed() && suggestions.length > 0) {
+  if (suggestions.length > 0) {
     overlay.webContents.send('suggestions:update', suggestions)
   }
 }
@@ -340,7 +622,7 @@ function broadcastTranscriptUpdate(): void {
       full: sessionTranscriptEntries,
     })
   }
-  void updateSuggestionsForOverlay(entriesToLines(sessionTranscriptEntries))
+  void updateLiveAssistForOverlay(entriesToLines(sessionTranscriptEntries))
 }
 
 function pushTranscriptEntry(entry: TranscriptEntry): void {
@@ -674,6 +956,11 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     return { enabled: isOverlayFollowEnabled() }
   })
 
+  ipcMain.handle('overlay:ready', () => {
+    markOverlayReady()
+    return { ok: true }
+  })
+
   ipcMain.handle(
     'overlay:toggle-protection',
     (_event, payload?: boolean | { enabled?: boolean }) => {
@@ -731,7 +1018,25 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
   registerValidatedHandler(
     'llm:session-analyze',
     { rateLimitKey: 'llm:session-analyze', rateLimit: LLM_RATE_LIMIT },
-    async () => analyzeLiveSession(getSessionTranscript()),
+    async () => {
+      if (getActiveMode().id === 'sales') return null
+      return analyzeLiveSession(getSessionTranscript())
+    },
+  )
+
+  registerValidatedHandler(
+    'llm:sales-live-assist',
+    { rateLimitKey: 'llm:sales-live-assist', rateLimit: SALES_ASSIST_RATE_LIMIT },
+    async () => {
+      const lines = getSessionTranscript()
+      const answerResult = await generateSalesAnswerAssist(lines)
+      if (answerResult?.error) return answerResult.error
+      return {
+        answer: answerResult?.answer ?? stickySalesPanel.answer ?? null,
+        suggestions: stickySalesPanel.suggestions ?? [],
+        opening: salesCallOpeningActive ? getSalesCallOpeningActions() : null,
+      } satisfies SalesPanelPayload
+    },
   )
 
   registerValidatedHandler(
@@ -746,6 +1051,7 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     sessionTranscriptEntries = []
     suggestionCounter = 0
     resetSuggestionState()
+    resetSalesAssistScheduler()
     clearTranscriptionQueue()
 
     configureTranscriptionQueue({
@@ -759,6 +1065,13 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
     if (overlay && !overlay.isDestroyed()) {
       overlay.webContents.send('transcript:update', { recent: [], full: [] })
       overlay.webContents.send('suggestions:update', [])
+      if (getActiveMode().id === 'sales') {
+        salesSessionStartedAt = Date.now()
+        salesCallOpeningActive = true
+        stickySalesPanel = { opening: getSalesCallOpeningActions() }
+        overlay.webContents.send('sales-assist:update', stickySalesPanel)
+        overlay.webContents.send('sales-define:update', { defines: [] })
+      }
     }
 
     startRecording(() => {
@@ -1137,6 +1450,18 @@ export function registerHandlers(mainWindow?: BrowserWindow | null): void {
         throw new Error('modeId is required')
       }
       return setActiveMode(payload.modeId)
+    },
+  )
+
+  registerValidatedHandler(
+    'prefs:set-product-knowledge',
+    { requiresInput: true },
+    (data) => {
+      const payload = data as { knowledge?: string }
+      if (typeof payload.knowledge !== 'string') {
+        throw new Error('knowledge is required')
+      }
+      return setProductKnowledge(payload.knowledge)
     },
   )
 

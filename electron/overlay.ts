@@ -19,11 +19,22 @@ import {
   saveOverlaySize,
   setFollowEnabled,
   setOverlayBounds,
+  repositionOverlayToTopCenter,
   startOverlayFollow,
   stopOverlayFollow,
   toggleOverlayFollow as toggleFollowInternal,
   isOverlayFollowEnabled,
 } from './overlayPosition'
+
+export type ShowOverlayOptions = {
+  /** Bring overlay to front and focus it (dock click, relaunch). */
+  focus?: boolean
+  /** Snap to top-center of the active display. Default true. */
+  resetPosition?: boolean
+}
+
+let overlayReady = false
+let overlayReadyWatchdog: NodeJS.Timeout | null = null
 
 let overlayWindow: BrowserWindow | null = null
 let displayMetricsListenerAttached = false
@@ -228,15 +239,68 @@ export {
   isOverlayFollowEnabled,
 }
 
-export function showOverlayWindow(): void {
+function clearOverlayReadyWatchdog(): void {
+  if (overlayReadyWatchdog) {
+    clearTimeout(overlayReadyWatchdog)
+    overlayReadyWatchdog = null
+  }
+}
+
+function handleOverlayLoadFailure(reason: string): void {
+  console.error(`[overlay] load failed: ${reason}`)
   if (!overlayWindow || overlayWindow.isDestroyed()) return
-  overlayWindow.showInactive()
+  if (!app.isPackaged) {
+    overlayWindow.webContents.openDevTools({ mode: 'detach' })
+  }
+}
+
+function scheduleOverlayReadyWatchdog(): void {
+  if (app.isPackaged || overlayReady) return
+  clearOverlayReadyWatchdog()
+  overlayReadyWatchdog = setTimeout(() => {
+    if (overlayReady || !overlayWindow || overlayWindow.isDestroyed()) return
+    console.warn('[overlay] renderer did not signal ready — reloading overlay')
+    overlayWindow.webContents.openDevTools({ mode: 'detach' })
+    const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173'
+    void overlayWindow.loadURL(`${devUrl}/overlay.html`)
+  }, 5000)
+}
+
+export function markOverlayReady(): void {
+  overlayReady = true
+  clearOverlayReadyWatchdog()
+}
+
+export function showOverlayWindow(options: ShowOverlayOptions = {}): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return
+  const resetPosition = options.resetPosition !== false
+  if (resetPosition) {
+    repositionOverlayToTopCenter(overlayWindow)
+  }
+  if (options.focus) {
+    overlayWindow.show()
+    overlayWindow.focus()
+  } else {
+    overlayWindow.showInactive()
+  }
+  if (process.platform === 'darwin') {
+    overlayWindow.moveTop()
+  }
   applyOverlayWindowPolicies(overlayWindow)
+}
+
+/** Show overlay on the active display — used at launch and when user re-activates the app. */
+export function ensureOverlayVisible(): void {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    createOverlayWindow()
+    return
+  }
+  showOverlayWindow({ focus: true, resetPosition: true })
 }
 
 export function createOverlayWindow(): BrowserWindow {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
-    showOverlayWindow()
+    showOverlayWindow({ focus: true, resetPosition: true })
     return overlayWindow
   }
 
@@ -300,8 +364,17 @@ export function createOverlayWindow(): BrowserWindow {
   })
 
   overlayWindow.once('ready-to-show', () => {
-    showOverlayWindow()
+    showOverlayWindow({ focus: true, resetPosition: true })
     scheduleStealthApply()
+    scheduleOverlayReadyWatchdog()
+  })
+
+  overlayWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    handleOverlayLoadFailure(`${errorCode} ${errorDescription}`)
+  })
+
+  overlayWindow.webContents.on('did-finish-load', () => {
+    scheduleOverlayReadyWatchdog()
   })
 
   const isDev = !app.isPackaged
@@ -313,7 +386,6 @@ export function createOverlayWindow(): BrowserWindow {
       }
     }
     loadDevOverlay()
-    setTimeout(loadDevOverlay, 800)
   } else {
     if (!overlayWindow.isDestroyed()) {
       overlayWindow.loadFile(path.join(__dirname, '../dist/overlay.html'))
@@ -331,6 +403,8 @@ function attachMovePersistence(window: BrowserWindow): void {
 }
 
 export function destroyOverlayWindow(): void {
+  clearOverlayReadyWatchdog()
+  overlayReady = false
   stopOverlayFollow()
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.destroy()
@@ -347,7 +421,7 @@ export function toggleOverlayVisibility(): void {
   if (overlayWindow.isVisible()) {
     overlayWindow.hide()
   } else {
-    showOverlayWindow()
+    showOverlayWindow({ focus: true, resetPosition: true })
   }
 }
 

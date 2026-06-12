@@ -25,17 +25,13 @@ type ModeConfig = {
   builtin?: boolean
 }
 
-function isCustomMode(mode: ModeConfig): boolean {
-  if (mode.builtin === true) return false
-  return mode.builtin === false || mode.id.startsWith('mode-')
-}
-
 type PublicPreferences = {
   activeModelId: string
   models: ModelConfig[]
   activeModeId: string
   modes: ModeConfig[]
   showModelInToolbar: boolean
+  productKnowledge: string
 }
 
 type SettingsTab =
@@ -329,12 +325,6 @@ export default function SettingsApp() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [permissions, setPermissions] = useState<PermissionState | null>(null)
   const [showAddModel, setShowAddModel] = useState(false)
-  const [showAddMode, setShowAddMode] = useState(false)
-  const [newMode, setNewMode] = useState({
-    label: '',
-    category: '',
-    description: '',
-  })
   const [expandedProviders, setExpandedProviders] = useState<Set<ModelProvider>>(
     () => new Set(['anthropic', 'openai', 'gemini']),
   )
@@ -367,12 +357,16 @@ export default function SettingsApp() {
   const [keybindAccelerators, setKeybindAccelerators] = useState<KeybindPreferences | null>(null)
   const [recordingKeybindId, setRecordingKeybindId] = useState<KeybindActionId | null>(null)
   const [keybindError, setKeybindError] = useState('')
+  const [productKnowledgeDraft, setProductKnowledgeDraft] = useState('')
+  const [productKnowledgeSaving, setProductKnowledgeSaving] = useState(false)
+  const [productKnowledgeSaved, setProductKnowledgeSaved] = useState(false)
 
   const loadPrefs = useCallback(async () => {
     setPrefsLoading(true)
     try {
       const data = (await window.electronAPI.invoke('prefs:load')) as PublicPreferences
       setPrefs(data)
+      setProductKnowledgeDraft(data.productKnowledge ?? '')
     } finally {
       setPrefsLoading(false)
     }
@@ -487,7 +481,9 @@ export default function SettingsApp() {
       applyKeybindPrefs(payload as { definitions?: KeybindDefinition[]; accelerators?: KeybindPreferences })
     })
     window.electronAPI.on('prefs:changed', (next) => {
-      setPrefs(next as PublicPreferences)
+      const data = next as PublicPreferences
+      setPrefs(data)
+      setProductKnowledgeDraft(data.productKnowledge ?? '')
     })
   }, [loadPrefs, loadProfile, loadPermissions, loadAudioPrefs, loadChatHistory, loadAudioSessions, loadKeybindPrefs, applyKeybindPrefs])
 
@@ -567,21 +563,39 @@ export default function SettingsApp() {
     setPrefs(data)
   }
 
-  const addMode = async () => {
-    if (!newMode.label.trim()) return
-    const data = (await window.electronAPI.invoke('prefs:add-mode', {
-      label: newMode.label.trim(),
-      category: newMode.category.trim() || undefined,
-      description: newMode.description.trim() || undefined,
-    })) as PublicPreferences
-    setPrefs(data)
-    setShowAddMode(false)
-    setNewMode({ label: '', category: '', description: '' })
+  const saveProductKnowledge = async () => {
+    setProductKnowledgeSaving(true)
+    setProductKnowledgeSaved(false)
+    try {
+      const data = (await window.electronAPI.invoke('prefs:set-product-knowledge', {
+        knowledge: productKnowledgeDraft,
+      })) as PublicPreferences
+      setPrefs(data)
+      setProductKnowledgeDraft(data.productKnowledge ?? '')
+      setProductKnowledgeSaved(true)
+      window.setTimeout(() => setProductKnowledgeSaved(false), 2000)
+    } finally {
+      setProductKnowledgeSaving(false)
+    }
   }
 
-  const removeMode = async (modeId: string) => {
-    const data = (await window.electronAPI.invoke('prefs:remove-mode', { modeId })) as PublicPreferences
-    setPrefs(data)
+  const uploadProductKnowledge = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.txt,.md,.csv,text/plain,text/markdown'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (file.size > 500 * 1024) return
+      void file.text().then((text) => {
+        setProductKnowledgeDraft((prev) => {
+          const trimmed = text.trim()
+          if (!trimmed) return prev
+          return prev.trim() ? `${prev.trim()}\n\n${trimmed}` : trimmed
+        })
+      })
+    }
+    input.click()
   }
 
   const setActiveModel = async (modelId: string) => {
@@ -1319,15 +1333,6 @@ export default function SettingsApp() {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
-                            {isCustomMode(mode) && (
-                              <button
-                                type="button"
-                                className="settings-btn small"
-                                onClick={() => void removeMode(mode.id)}
-                              >
-                                Delete
-                              </button>
-                            )}
                             {prefs.activeModeId !== mode.id && (
                               <button
                                 type="button"
@@ -1344,75 +1349,45 @@ export default function SettingsApp() {
                   </div>
                 ))}
 
-                {!showAddMode ? (
-                  <button
-                    type="button"
-                    className="settings-btn"
-                    style={{ marginTop: 12 }}
-                    onClick={() => setShowAddMode(true)}
-                  >
-                    Add custom mode
-                  </button>
-                ) : (
-                  <div className="settings-add-form settings-card" style={{ marginTop: 12 }}>
-                    <h3>Add custom mode</h3>
-                    <p className="settings-card-desc">
-                      Name your mode and describe what Clarifi should help with. Built-in modes are
-                      managed by Clarifi and cannot be edited.
-                    </p>
-                    <div className="settings-form-grid">
-                      <div className="settings-field">
-                        <label>Mode name</label>
-                        <input
-                          className="settings-input"
-                          value={newMode.label}
-                          onChange={(e) => setNewMode((p) => ({ ...p, label: e.target.value }))}
-                          placeholder="Client onboarding calls"
-                        />
-                      </div>
-                      <div className="settings-field">
-                        <label>Category (optional)</label>
-                        <input
-                          className="settings-input"
-                          value={newMode.category}
-                          onChange={(e) => setNewMode((p) => ({ ...p, category: e.target.value }))}
-                          placeholder="Custom"
-                        />
-                      </div>
-                      <div className="settings-field" style={{ gridColumn: '1 / -1' }}>
-                        <label>What should Clarifi help with?</label>
-                        <textarea
-                          className="settings-textarea"
-                          value={newMode.description}
-                          onChange={(e) =>
-                            setNewMode((p) => ({ ...p, description: e.target.value }))
-                          }
-                          placeholder="e.g. Help me handle pricing objections and schedule follow-up demos."
-                          rows={4}
-                        />
-                      </div>
-                    </div>
-                    <div className="settings-form-actions">
-                      <button
-                        type="button"
-                        className="settings-btn primary"
-                        onClick={() => void addMode()}
-                      >
-                        Save mode
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-btn"
-                        onClick={() => {
-                          setShowAddMode(false)
-                          setNewMode({ label: '', category: '', description: '' })
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                <div className="settings-card" style={{ marginTop: 24 }}>
+                  <div className="settings-card-title">Product knowledge</div>
+                  <p className="settings-card-desc">
+                    Paste or upload battlecards, pricing, FAQs, and product docs. Used during Sales
+                    mode live calls and post-call recaps. If empty, Clarifi infers from the
+                    transcript only.
+                  </p>
+                  <textarea
+                    className="settings-textarea"
+                    rows={10}
+                    placeholder="Paste product info, objection handlers, pricing tiers, feature summaries…"
+                    value={productKnowledgeDraft}
+                    onChange={(e) => setProductKnowledgeDraft(e.target.value)}
+                  />
+                  <div className="settings-profile-upload-row" style={{ marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="settings-btn"
+                      onClick={uploadProductKnowledge}
+                    >
+                      Upload file
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-btn small primary"
+                      disabled={productKnowledgeSaving}
+                      onClick={() => void saveProductKnowledge()}
+                    >
+                      {productKnowledgeSaving
+                        ? 'Saving…'
+                        : productKnowledgeSaved
+                          ? 'Saved'
+                          : 'Save knowledge'}
+                    </button>
                   </div>
-                )}
+                  <p className="settings-profile-upload-hint">
+                    Supports .txt, .md, .csv up to 500 KB. Max 80,000 characters stored.
+                  </p>
+                </div>
               </>
             )}
           </>
@@ -1639,8 +1614,8 @@ export default function SettingsApp() {
                     handleTranscriptionMode(e.target.value === 'dual' ? 'dual' : 'group')
                   }
                 >
-                  <option value="group">Group call (recommended)</option>
-                  <option value="dual">One-on-one (Me / Them)</option>
+                  <option value="dual">One-on-one (Me / Them) — recommended for sales</option>
+                  <option value="group">Group call (Speaker 1, 2, …)</option>
                 </select>
               </div>
             </section>

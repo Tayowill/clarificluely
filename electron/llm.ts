@@ -3,6 +3,11 @@ import { isProxyConfigured, proxyChat, proxySuggest } from './proxyClient'
 import {
   CLARIFI_AUDIO_SESSION_CHAT_PROMPT,
   CLARIFI_ENTERPRISE_SYSTEM_PROMPT,
+  CLARIFI_SALES_DEFINE_PROMPT,
+  CLARIFI_SALES_ANSWER_PROMPT,
+  CLARIFI_SALES_LIVE_ASSIST_PROMPT,
+  CLARIFI_SALES_SESSION_RECAP_PROMPT,
+  CLARIFI_SALES_SUGGESTIONS_PROMPT,
   CLARIFI_SESSION_ANALYSIS_PROMPT,
   CLARIFI_SESSION_RECAP_PROMPT,
   CLARIFI_SPEAKER_INFERENCE_PROMPT,
@@ -16,11 +21,20 @@ import {
 } from './transcriptUtils'
 import { getOutputLanguageInstruction } from './audioPreferences'
 import {
+  resolveAnthropicApiModelId,
+  SALES_ASSIST_ANTHROPIC_MODEL_ID,
+} from '../shared/builtin-models'
+import {
   getActiveMode,
   getActiveModel,
   getModelApiKey,
+  getProductKnowledge,
   type ModelConfig,
 } from './userPreferences'
+import {
+  detectAnswerTrigger,
+  detectSuggestionTrigger,
+} from './salesAssistTrigger'
 
 export interface Suggestion {
   text: string
@@ -31,12 +45,30 @@ let lastTranscript = ''
 let isProcessing = false
 let lastAnalysisTranscript = ''
 let isAnalyzing = false
+let lastAnswerTriggerKey = ''
+let lastStickyAnswer: SalesAssistAction | null = null
+let lastSuggestionTriggerKey = ''
+let lastStickySuggestions: SalesAssistAction[] = []
+let definedTermsCache = new Map<string, SalesDefineEntry>()
+let isSalesAnswering = false
+let isSalesSuggesting = false
+let isSalesDefining = false
+let isSalesAssisting = false
 
 export function resetSuggestionState(): void {
   lastTranscript = ''
   isProcessing = false
   lastAnalysisTranscript = ''
   isAnalyzing = false
+  lastAnswerTriggerKey = ''
+  lastStickyAnswer = null
+  lastSuggestionTriggerKey = ''
+  lastStickySuggestions = []
+  definedTermsCache = new Map()
+  isSalesAnswering = false
+  isSalesSuggesting = false
+  isSalesDefining = false
+  isSalesAssisting = false
 }
 
 export interface SessionEntity {
@@ -55,6 +87,71 @@ export interface LiveSessionInsights {
   openQuestions: string[]
 }
 
+export type SalesCardKind =
+  | 'speak_now'
+  | 'technical_lookup'
+  | 'objection'
+  | 'product_info'
+  | 'discovery'
+  | 'next_step'
+
+export interface SalesAssistAction {
+  kind: SalesCardKind
+  label: string
+  speakable: string
+  context?: string
+}
+
+export interface SalesLiveAssist {
+  actions: SalesAssistAction[]
+}
+
+export interface SalesDefineEntry {
+  term: string
+  speakable: string
+  context?: string
+}
+
+export type SalesPanelPayload = {
+  answer?: SalesAssistAction | null
+  suggestions?: SalesAssistAction[]
+  opening?: SalesAssistAction[] | null
+}
+
+export type SalesPanelBroadcast = SalesPanelPayload & {
+  error?: SalesAssistError
+}
+
+export type SalesDefinePayload = {
+  defines: SalesDefineEntry[]
+}
+
+export type SalesAssistErrorCode =
+  | 'no_api_key'
+  | 'assist_failed'
+  | 'rate_limit_exceeded'
+
+export type SalesAssistError = {
+  error: SalesAssistErrorCode
+  message: string
+}
+
+export type SalesLiveAssistResult = SalesLiveAssist | SalesAssistError
+
+export function isSalesAssistError(
+  result: SalesLiveAssistResult | null | undefined,
+): result is SalesAssistError {
+  return Boolean(
+    result && typeof result === 'object' && 'error' in result && !('actions' in result),
+  )
+}
+
+export interface SalesObjectionRecap {
+  type: string
+  summary: string
+  handled: string
+}
+
 export interface SessionRecap {
   summary: string
   /** @deprecated use discussionPoints — kept for older saved sessions */
@@ -64,6 +161,18 @@ export interface SessionRecap {
   decisions: string[]
   openQuestions: string[]
   recapEmailDraft: string
+  dealSummary?: string
+  painPointsUncovered?: string[]
+  objectionsRaised?: SalesObjectionRecap[]
+  competitorsMentioned?: string[]
+  budgetTimelineSignals?: string[]
+  buyingSignals?: string[]
+  stakeholderMap?: string[]
+  riskFlags?: string[]
+  mutualActionPlan?: string[]
+  nextCallAgenda?: string[]
+  prospectFollowUpEmail?: string
+  internalCrmNote?: string
 }
 
 function parseJsonPayload<T>(text: string): T | null {
@@ -81,11 +190,77 @@ type LlmCallConfig = {
   provider: ModelConfig['provider']
 }
 
+type LlmCompletion =
+  | { ok: true; text: string }
+  | { ok: false; message: string }
+
+function formatAnthropicError(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as {
+      error?: { type?: string; message?: string }
+    }
+    const msg = parsed?.error?.message?.trim()
+    const type = parsed?.error?.type
+    if (msg && type === 'not_found_error') {
+      return `Model not found: ${msg}. Try Claude Haiku 4.5 in Settings → Models.`
+    }
+    if (msg && type === 'authentication_error') {
+      return 'Invalid Anthropic API key. Check ANTHROPIC_API_KEY in .env.local.'
+    }
+    if (msg) return msg
+  } catch {
+    // fall through
+  }
+  return 'Anthropic API request failed. Check your API key and model in Settings.'
+}
+
 async function resolveLlmCallConfig(): Promise<LlmCallConfig | null> {
   const model = getActiveModel()
   const apiKey = await getModelApiKey(model)
   if (!apiKey) return null
-  return { modelId: model.modelId, apiKey, provider: model.provider }
+  const modelId =
+    model.provider === 'anthropic'
+      ? resolveAnthropicApiModelId(model.modelId)
+      : model.modelId
+  return { modelId, apiKey, provider: model.provider }
+}
+
+/** Sales assist always uses Haiku for speed; key from active Anthropic model or ANTHROPIC_API_KEY. */
+async function resolveSalesAssistLlmConfig(): Promise<LlmCallConfig | null> {
+  const { getAnthropicApiKey } = await import('./keys')
+  const active = getActiveModel()
+  const apiKey =
+    (active.provider === 'anthropic' ? await getModelApiKey(active) : null) ??
+    (await getAnthropicApiKey())
+  if (!apiKey) return null
+  return {
+    modelId: SALES_ASSIST_ANTHROPIC_MODEL_ID,
+    apiKey,
+    provider: 'anthropic',
+  }
+}
+
+async function completeWithLlmConfig(
+  config: LlmCallConfig,
+  systemPrompt: string,
+  userContent: AnthropicContentBlock[] | string,
+  maxTokens: number,
+): Promise<LlmCompletion> {
+  if (config.provider === 'openai') {
+    const text = await callOpenAiChat(config, systemPrompt, userContent, maxTokens)
+    return text
+      ? { ok: true, text }
+      : { ok: false, message: 'OpenAI request failed. Check your API key and model.' }
+  }
+
+  if (config.provider === 'gemini') {
+    const text = await callGeminiChat(config, systemPrompt, userContent, maxTokens)
+    return text
+      ? { ok: true, text }
+      : { ok: false, message: 'Gemini request failed. Check your API key and model.' }
+  }
+
+  return callAnthropicMessages(config, systemPrompt, userContent, maxTokens)
 }
 
 async function callAnthropicMessages(
@@ -93,7 +268,7 @@ async function callAnthropicMessages(
   systemPrompt: string,
   userContent: AnthropicContentBlock[] | string,
   maxTokens: number,
-): Promise<string | null> {
+): Promise<LlmCompletion> {
   const content =
     typeof userContent === 'string' ? [{ type: 'text', text: userContent }] : userContent
 
@@ -115,11 +290,15 @@ async function callAnthropicMessages(
   if (!response.ok) {
     const err = await response.text()
     console.error('LLM error:', err)
-    return null
+    return { ok: false, message: formatAnthropicError(err) }
   }
 
   const data = (await response.json()) as { content?: Array<{ text?: string }> }
-  return data.content?.[0]?.text?.trim() ?? null
+  const text = data.content?.[0]?.text?.trim() ?? ''
+  if (!text) {
+    return { ok: false, message: 'Anthropic returned an empty response.' }
+  }
+  return { ok: true, text }
 }
 
 type OpenAiContentPart =
@@ -250,7 +429,224 @@ async function completeWithActiveModel(
     return callGeminiChat(config, systemPrompt, userContent, maxTokens)
   }
 
-  return callAnthropicMessages(config, systemPrompt, userContent, maxTokens)
+  const result = await callAnthropicMessages(config, systemPrompt, userContent, maxTokens)
+  return result.ok ? result.text : null
+}
+
+export function isSalesAssistInFlight(): boolean {
+  return isSalesAssisting || isSalesAnswering || isSalesSuggesting || isSalesDefining
+}
+
+export function getSalesCallOpeningActions(): SalesAssistAction[] {
+  return [
+    {
+      kind: 'speak_now',
+      label: 'Break the ice',
+      speakable:
+        "Thanks for making time today — before we dive in, how's your week going?",
+      context: 'Warm opener',
+    },
+    {
+      kind: 'speak_now',
+      label: 'Quick intro',
+      speakable:
+        "I'd love a quick intro on your side, then we can align on what you'd like to get out of this call.",
+      context: 'Set the agenda',
+    },
+  ]
+}
+
+function buildSalesAssistSystemPrompt(basePrompt: string): string {
+  const activeMode = getActiveMode()
+  const productKnowledge = getProductKnowledge()
+  const outputLanguageHint = getOutputLanguageInstruction()
+  return `${basePrompt}\n\nActive mode:\n${activeMode.systemPrompt}${buildSalesKnowledgeBlock(productKnowledge)}${outputLanguageHint}`
+}
+
+async function requireSalesLlmConfig(): Promise<LlmCallConfig | SalesAssistError> {
+  const llmConfig = await resolveSalesAssistLlmConfig()
+  if (!llmConfig) {
+    return {
+      error: 'no_api_key',
+      message:
+        'Add ANTHROPIC_API_KEY to .env.local (or set a model API key in Settings → Models).',
+    }
+  }
+  return llmConfig
+}
+
+function normalizeSingleAction(
+  raw: Partial<SalesAssistAction> & { headline?: string } | undefined,
+  fallbackKind: SalesCardKind,
+): SalesAssistAction | null {
+  if (!raw) return null
+  return normalizeSalesAction({ ...raw, kind: raw.kind ?? fallbackKind })
+}
+
+export async function generateSalesAnswerAssist(
+  transcriptLines: string[],
+): Promise<{ answer?: SalesAssistAction; error?: SalesAssistError } | null> {
+  if (isSalesAnswering) return null
+  if (transcriptLines.length === 0) return null
+
+  const tailLines = transcriptLines.slice(-30)
+  const tail = tailLines.join('\n')
+  const trigger = detectAnswerTrigger(tailLines)
+  if (!trigger) return null
+  if (trigger.key === lastAnswerTriggerKey && lastStickyAnswer) return null
+
+  const llmResult = await requireSalesLlmConfig()
+  if ('error' in llmResult) return { error: llmResult }
+
+  isSalesAnswering = true
+  try {
+    const completion = await completeWithLlmConfig(
+      llmResult,
+      buildSalesAssistSystemPrompt(CLARIFI_SALES_ANSWER_PROMPT),
+      `Active moment (${trigger.kind}): ${trigger.summary}\n\nTranscript (most recent at bottom):\n${tail}`,
+      500,
+    )
+    if (!completion.ok) {
+      return { error: { error: 'assist_failed', message: completion.message } }
+    }
+
+    const parsed = parseJsonPayload<{
+      action?: Partial<SalesAssistAction> & { headline?: string }
+      actions?: Array<Partial<SalesAssistAction> & { headline?: string }>
+    }>(completion.text)
+    if (!parsed) {
+      return {
+        error: {
+          error: 'assist_failed',
+          message: 'Could not parse answer — try again in a few seconds.',
+        },
+      }
+    }
+
+    const action =
+      normalizeSingleAction(parsed.action, trigger.kind === 'objection' ? 'objection' : 'product_info') ??
+      collectSalesActions(parsed).find((item) => item.kind === 'product_info' || item.kind === 'objection') ??
+      null
+
+    if (!action) return null
+
+    lastAnswerTriggerKey = trigger.key
+    lastStickyAnswer = action
+    return { answer: action }
+  } catch (err) {
+    console.error('Sales answer assist error:', err)
+    return {
+      error: {
+        error: 'assist_failed',
+        message: 'Assist error — check the terminal log or your API key.',
+      },
+    }
+  } finally {
+    isSalesAnswering = false
+  }
+}
+
+export async function generateSalesSuggestionAssist(
+  transcriptLines: string[],
+): Promise<{ suggestions?: SalesAssistAction[] } | null> {
+  if (isSalesSuggesting) return null
+  if (transcriptLines.length === 0) return null
+
+  const tailLines = transcriptLines.slice(-30)
+  const tail = tailLines.join('\n')
+  const trigger = detectSuggestionTrigger(tailLines)
+  if (!trigger) return null
+  if (trigger.key === lastSuggestionTriggerKey && lastStickySuggestions.length > 0) return null
+
+  const llmResult = await requireSalesLlmConfig()
+  if ('error' in llmResult) return null
+
+  isSalesSuggesting = true
+  try {
+    const completion = await completeWithLlmConfig(
+      llmResult,
+      buildSalesAssistSystemPrompt(CLARIFI_SALES_SUGGESTIONS_PROMPT),
+      `Active moment (${trigger.kind}): ${trigger.summary}\n\nTranscript (most recent at bottom):\n${tail}`,
+      400,
+    )
+    if (!completion.ok) return null
+
+    const parsed = parseJsonPayload<{
+      suggestions?: Array<Partial<SalesAssistAction> & { headline?: string }>
+      actions?: Array<Partial<SalesAssistAction> & { headline?: string }>
+    }>(completion.text)
+    if (!parsed) return null
+
+    const suggestions = (Array.isArray(parsed.suggestions) ? parsed.suggestions : parsed.actions ?? [])
+      .map((item) => normalizeSalesAction(item))
+      .filter((item): item is SalesAssistAction => item !== null)
+      .filter((item) => item.kind !== 'product_info' && item.kind !== 'objection')
+      .slice(0, 2)
+
+    if (suggestions.length === 0) return null
+
+    lastSuggestionTriggerKey = trigger.key
+    lastStickySuggestions = suggestions
+    return { suggestions }
+  } catch (err) {
+    console.error('Sales suggestion assist error:', err)
+    return null
+  } finally {
+    isSalesSuggesting = false
+  }
+}
+
+export async function generateSalesTermDefine(
+  term: string,
+  transcriptLines: string[],
+): Promise<SalesDefineEntry | null> {
+  const key = term.toLowerCase().trim()
+  if (!key || definedTermsCache.has(key)) return null
+  if (isSalesDefining) return null
+
+  const llmResult = await requireSalesLlmConfig()
+  if ('error' in llmResult) return null
+
+  const tail = transcriptLines.slice(-30).join('\n')
+  isSalesDefining = true
+  try {
+    const completion = await completeWithLlmConfig(
+      llmResult,
+      CLARIFI_SALES_DEFINE_PROMPT,
+      `Term to define: ${term}\n\nRecent transcript:\n${tail}`,
+      200,
+    )
+    if (!completion.ok) return null
+
+    const parsed = parseJsonPayload<{
+      term?: string
+      speakable?: string
+      context?: string
+    }>(completion.text)
+    const speakable = parsed?.speakable?.trim()
+    if (!speakable) return null
+
+    const entry: SalesDefineEntry = {
+      term: parsed?.term?.trim() || term,
+      speakable,
+      context: parsed?.context?.trim() || undefined,
+    }
+    definedTermsCache.set(key, entry)
+    return entry
+  } catch (err) {
+    console.error('Sales define error:', err)
+    return null
+  } finally {
+    isSalesDefining = false
+  }
+}
+
+export function getCachedSalesDefines(): SalesDefineEntry[] {
+  return [...definedTermsCache.values()].slice(-3)
+}
+
+export function hasStickySalesAnswer(): boolean {
+  return lastStickyAnswer !== null
 }
 
 export interface ScreenContextImage {
@@ -427,6 +823,167 @@ export async function analyzeLiveSession(
   }
 }
 
+const SALES_CARD_KINDS: SalesCardKind[] = [
+  'speak_now',
+  'technical_lookup',
+  'objection',
+  'product_info',
+  'discovery',
+  'next_step',
+]
+
+function normalizeSalesKind(kind: unknown): SalesCardKind {
+  return SALES_CARD_KINDS.includes(kind as SalesCardKind) ? (kind as SalesCardKind) : 'speak_now'
+}
+
+function defaultActionLabel(kind: SalesCardKind, headline: string): string {
+  const h = headline.trim() || 'this'
+  switch (kind) {
+    case 'technical_lookup':
+      return h.toLowerCase().startsWith('define ') ? h : `Define ${h}`
+    case 'product_info':
+      return h.toLowerCase().startsWith('answer') ? h : `Answer: ${h}`
+    case 'objection':
+      return h.toLowerCase().startsWith('rebuttal') ? h : `Rebuttal: ${h}`
+    default:
+      return h
+  }
+}
+
+function normalizeSalesAction(
+  raw: Partial<SalesAssistAction> & { headline?: string },
+  loose = false,
+): SalesAssistAction | null {
+  if (!raw) return null
+  const speakable =
+    typeof raw.speakable === 'string' && raw.speakable.trim()
+      ? raw.speakable.trim()
+      : loose && typeof raw.context === 'string' && raw.context.trim().length > 12
+        ? raw.context.trim()
+        : ''
+  if (!speakable) return null
+  const kind = normalizeSalesKind(raw.kind)
+  const headline =
+    typeof raw.label === 'string' && raw.label.trim()
+      ? raw.label.trim()
+      : typeof raw.headline === 'string' && raw.headline.trim()
+        ? raw.headline.trim()
+        : ''
+  const label = headline ? defaultActionLabel(kind, headline) : defaultActionLabel(kind, 'Say this now')
+  return {
+    kind,
+    label,
+    speakable,
+    context:
+      typeof raw.context === 'string' && raw.context.trim() && raw.context.trim() !== speakable
+        ? raw.context.trim()
+        : undefined,
+  }
+}
+
+function collectSalesActions(parsed: {
+  actions?: Array<Partial<SalesAssistAction> & { headline?: string }>
+  primaryCard?: Partial<SalesAssistAction> & { headline?: string }
+  secondaryCards?: Array<Partial<SalesAssistAction> & { headline?: string }>
+}): SalesAssistAction[] {
+  const fromActions = (Array.isArray(parsed.actions) ? parsed.actions : [])
+    .map((item) => normalizeSalesAction(item))
+    .filter((item): item is SalesAssistAction => item !== null)
+
+  if (fromActions.length > 0) return fromActions.slice(0, 5)
+
+  const legacy = [
+    parsed.primaryCard,
+    ...(Array.isArray(parsed.secondaryCards) ? parsed.secondaryCards : []),
+  ]
+    .map((item) => normalizeSalesAction(item ?? {}))
+    .filter((item): item is SalesAssistAction => item !== null)
+
+  if (legacy.length > 0) return legacy.slice(0, 5)
+
+  const looseSources = [
+    ...(Array.isArray(parsed.actions) ? parsed.actions : []),
+    parsed.primaryCard,
+    ...(Array.isArray(parsed.secondaryCards) ? parsed.secondaryCards : []),
+  ]
+  const loose = looseSources
+    .map((item) => normalizeSalesAction(item ?? {}, true))
+    .filter((item): item is SalesAssistAction => item !== null)
+
+  return loose.slice(0, 5)
+}
+
+function buildSalesKnowledgeBlock(productKnowledge: string): string {
+  if (productKnowledge) {
+    return `\n\n<product_knowledge>\n${productKnowledge}\n</product_knowledge>`
+  }
+  return `\n\n<product_knowledge>\nNo product knowledge provided. Infer product details ONLY from the transcript. Do not invent features or pricing not discussed.\n</product_knowledge>`
+}
+
+function normalizeSessionRecap(parsed: SessionRecap): SessionRecap {
+  const discussionPoints = Array.isArray(parsed.discussionPoints)
+    ? parsed.discussionPoints
+    : Array.isArray(parsed.highlights)
+      ? parsed.highlights
+      : []
+
+  const prospectFollowUp =
+    typeof parsed.prospectFollowUpEmail === 'string' && parsed.prospectFollowUpEmail.trim()
+      ? parsed.prospectFollowUpEmail.trim()
+      : undefined
+
+  const recapEmailDraft =
+    typeof parsed.recapEmailDraft === 'string' && parsed.recapEmailDraft.trim()
+      ? parsed.recapEmailDraft.trim()
+      : (prospectFollowUp ?? '')
+
+  const objectionsRaised = Array.isArray(parsed.objectionsRaised)
+    ? parsed.objectionsRaised
+        .filter(
+          (o) =>
+            o &&
+            typeof o === 'object' &&
+            typeof (o as SalesObjectionRecap).summary === 'string',
+        )
+        .map((o) => ({
+          type: typeof o.type === 'string' ? o.type : 'other',
+          summary: o.summary,
+          handled: typeof o.handled === 'string' ? o.handled : 'unresolved',
+        }))
+    : undefined
+
+  return {
+    summary: parsed.summary ?? '',
+    highlights: discussionPoints,
+    discussionPoints,
+    actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
+    decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
+    openQuestions: Array.isArray(parsed.openQuestions) ? parsed.openQuestions : [],
+    recapEmailDraft,
+    dealSummary: typeof parsed.dealSummary === 'string' ? parsed.dealSummary : undefined,
+    painPointsUncovered: Array.isArray(parsed.painPointsUncovered)
+      ? parsed.painPointsUncovered
+      : undefined,
+    objectionsRaised,
+    competitorsMentioned: Array.isArray(parsed.competitorsMentioned)
+      ? parsed.competitorsMentioned
+      : undefined,
+    budgetTimelineSignals: Array.isArray(parsed.budgetTimelineSignals)
+      ? parsed.budgetTimelineSignals
+      : undefined,
+    buyingSignals: Array.isArray(parsed.buyingSignals) ? parsed.buyingSignals : undefined,
+    stakeholderMap: Array.isArray(parsed.stakeholderMap) ? parsed.stakeholderMap : undefined,
+    riskFlags: Array.isArray(parsed.riskFlags) ? parsed.riskFlags : undefined,
+    mutualActionPlan: Array.isArray(parsed.mutualActionPlan)
+      ? parsed.mutualActionPlan
+      : undefined,
+    nextCallAgenda: Array.isArray(parsed.nextCallAgenda) ? parsed.nextCallAgenda : undefined,
+    prospectFollowUpEmail: prospectFollowUp,
+    internalCrmNote:
+      typeof parsed.internalCrmNote === 'string' ? parsed.internalCrmNote : undefined,
+  }
+}
+
 export async function generateSessionRecap(
   transcriptLines: string[],
 ): Promise<SessionRecap | null> {
@@ -434,34 +991,26 @@ export async function generateSessionRecap(
 
   const transcript = transcriptLines.join('\n')
   const outputLanguageHint = getOutputLanguageInstruction()
-  const systemPrompt = `${CLARIFI_SESSION_RECAP_PROMPT}${outputLanguageHint}`
+  const activeMode = getActiveMode()
+  const isSales = activeMode.id === 'sales'
+  const productKnowledge = getProductKnowledge()
+
+  const systemPrompt = isSales
+    ? `${CLARIFI_SALES_SESSION_RECAP_PROMPT}${buildSalesKnowledgeBlock(productKnowledge)}${outputLanguageHint}`
+    : `${CLARIFI_SESSION_RECAP_PROMPT}${outputLanguageHint}`
 
   try {
     const text = await completeWithActiveModel(
       systemPrompt,
       `Full meeting transcript:\n${transcript}`,
-      1200,
+      isSales ? 1600 : 1200,
     )
     if (!text) return null
 
     const parsed = parseJsonPayload<SessionRecap>(text)
     if (!parsed) return null
 
-    const discussionPoints = Array.isArray(parsed.discussionPoints)
-      ? parsed.discussionPoints
-      : Array.isArray(parsed.highlights)
-        ? parsed.highlights
-        : []
-
-    return {
-      summary: parsed.summary ?? '',
-      highlights: discussionPoints,
-      discussionPoints,
-      actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
-      decisions: Array.isArray(parsed.decisions) ? parsed.decisions : [],
-      openQuestions: Array.isArray(parsed.openQuestions) ? parsed.openQuestions : [],
-      recapEmailDraft: parsed.recapEmailDraft ?? '',
-    }
+    return normalizeSessionRecap(parsed)
   } catch (err) {
     console.error('Session recap error:', err)
     return null
@@ -519,14 +1068,25 @@ export async function chatWithStoredAudioSession(
   const recapBlock = recap
     ? [
         `Summary: ${recap.summary}`,
+        recap.dealSummary ? `Deal summary: ${recap.dealSummary}` : '',
         discussionPoints.length > 0
           ? `Discussion points: ${discussionPoints.join('; ')}`
+          : '',
+        (recap.painPointsUncovered?.length ?? 0) > 0
+          ? `Pain points: ${recap.painPointsUncovered!.join('; ')}`
+          : '',
+        (recap.objectionsRaised?.length ?? 0) > 0
+          ? `Objections: ${recap.objectionsRaised!.map((o) => `${o.type}: ${o.summary}`).join('; ')}`
+          : '',
+        (recap.mutualActionPlan?.length ?? 0) > 0
+          ? `Mutual action plan: ${recap.mutualActionPlan!.join('; ')}`
           : '',
         recap.actionItems.length > 0 ? `Action items: ${recap.actionItems.join('; ')}` : '',
         (recap.decisions?.length ?? 0) > 0
           ? `Decisions: ${recap.decisions!.join('; ')}`
           : '',
         recap.openQuestions.length > 0 ? `Open questions: ${recap.openQuestions.join('; ')}` : '',
+        recap.internalCrmNote ? `CRM note: ${recap.internalCrmNote}` : '',
       ]
         .filter(Boolean)
         .join('\n')

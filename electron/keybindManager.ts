@@ -27,7 +27,7 @@ function sendOverlayAction(action: KeybindActionId): void {
   const overlay = getOverlayWindow()
   if (!overlay || overlay.isDestroyed()) return
   if (!overlay.isVisible()) {
-    showOverlayWindow()
+    showOverlayWindow({ focus: true, resetPosition: true })
   }
   overlay.webContents.send('keybind:action', { action })
 }

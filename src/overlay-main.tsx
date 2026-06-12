@@ -7,3 +7,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Overlay />
   </React.StrictMode>,
 )
+
+void window.electronAPI?.invoke('overlay:ready')

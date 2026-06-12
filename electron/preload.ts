@@ -13,6 +13,7 @@ const INVOKE_CHANNELS = [
   'llm:query',
   'llm:suggest',
   'llm:session-analyze',
+  'llm:sales-live-assist',
   'llm:session-recap',
   'llm:infer-speaker-labels',
   'llm:chat',
@@ -37,6 +38,7 @@ const INVOKE_CHANNELS = [
   'overlay:follow-status',
   'overlay:toggle-protection',
   'overlay:protection-status',
+  'overlay:ready',
   'overlay:update-suggestions',
   'audio:status',
   'audio:prefs-load',
@@ -69,6 +71,7 @@ const INVOKE_CHANNELS = [
   'prefs:set-active-model',
   'prefs:set-show-model-in-toolbar',
   'prefs:set-active-mode',
+  'prefs:set-product-knowledge',
   'prefs:add-mode',
   'prefs:remove-mode',
   'prefs:add-model',
@@ -90,6 +93,8 @@ const INVOKE_CHANNELS = [
 ] as const
 
 const EVENT_CHANNELS = [
+  'sales-assist:update',
+  'sales-define:update',
   'suggestions:update',
   'transcript:update',
   'transcription:activity',

@@ -17,8 +17,8 @@ import { checkForSignedUpdates, configureUpdater } from './updater'
 import {
   createOverlayWindow,
   destroyOverlayWindow,
+  ensureOverlayVisible,
   getOverlayWindow,
-  showOverlayWindow,
 } from './overlay'
 import { stopOverlayFollow } from './overlayPosition'
 // Show "Clarifi" in the menu bar instead of "Electron" during local dev.
@@ -92,27 +92,24 @@ async function showClarifiUI(): Promise<void> {
     return
   }
 
-  const overlay = getOverlayWindow()
-  if (!overlay || overlay.isDestroyed()) {
-    createOverlayWindow()
-    return
-  }
-
-  showOverlayWindow()
+  ensureOverlayVisible()
 }
 
-const gotLock = app.requestSingleInstanceLock()
+// Dev builds skip the singleton lock so a stale dev process cannot block Clarifi.app.
+const gotLock = app.isPackaged ? app.requestSingleInstanceLock() : true
 if (!gotLock) {
   logStartup('H3', 'single-instance-lock-denied')
   app.quit()
 } else {
-  logStartup('H3', 'single-instance-lock-acquired')
-  app.on('second-instance', (_event, argv) => {
-    logStartup('H3', 'second-instance-received')
-    const authUrl = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
-    if (authUrl) void handleAuthDeepLink(authUrl)
-    void showClarifiUI()
-  })
+  logStartup('H3', 'single-instance-lock-acquired', { packaged: app.isPackaged })
+  if (app.isPackaged) {
+    app.on('second-instance', (_event, argv) => {
+      logStartup('H3', 'second-instance-received')
+      const authUrl = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
+      if (authUrl) void handleAuthDeepLink(authUrl)
+      void showClarifiUI()
+    })
+  }
 }
 
 /** Optional legacy dev shell (index.html / MyApp). Off by default — overlay only. */
@@ -173,7 +170,7 @@ async function launchClarifi(): Promise<void> {
   }
 
   createOverlayWindow()
-  showOverlayWindow()
+  ensureOverlayVisible()
 }
 
 app.whenReady().then(async () => {

@@ -11,6 +11,21 @@ export type BuiltinModel = {
 
 export const DEFAULT_ACTIVE_MODEL_ID = 'claude-haiku-4-5'
 
+/** Fast model for live sales assist (always Haiku regardless of toolbar selection). */
+export const SALES_ASSIST_ANTHROPIC_MODEL_ID = 'claude-haiku-4-5-20251001'
+
+/**
+ * Map UI / marketing model ids to Anthropic API model strings.
+ * Fable and other preview-tier labels may not exist on the public API yet.
+ */
+export const ANTHROPIC_API_MODEL_ALIASES: Record<string, string> = {
+  'claude-fable-5': 'claude-sonnet-4-6',
+}
+
+export function resolveAnthropicApiModelId(modelId: string): string {
+  return ANTHROPIC_API_MODEL_ALIASES[modelId] ?? modelId
+}
+
 export const ANTHROPIC_MODEL_ORDER = [
   'claude-fable-5',
   'claude-opus-4-8',
