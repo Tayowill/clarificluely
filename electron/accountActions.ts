@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import { clearAudioSessions } from './audioSessionHistory'
 import { clearChatSessions } from './chatHistory'
 import { createOnboardingWindow } from './onboarding'
 import { resetOnboarding } from './onboardingState'
@@ -31,14 +32,17 @@ export async function eraseLocalAccountData(): Promise<void> {
   await logoutDevice()
   await resetOnboarding()
   clearChatSessions()
+  clearAudioSessions()
   removeLocalAvatar()
 
   const userData = app.getPath('userData')
   const filesToRemove = [
     'user-preferences.json',
     'audio-preferences.json',
+    'keybind-preferences.json',
     'overlay-settings.json',
     'chat-history.json',
+    'audio-sessions-history.json',
   ]
 
   for (const file of filesToRemove) {

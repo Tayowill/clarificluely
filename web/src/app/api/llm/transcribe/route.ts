@@ -32,6 +32,7 @@ export async function POST(req: Request) {
     audioBase64?: string
     format?: 'wav' | 'webm'
     language?: string
+    prompt?: string
   }
 
   if (!payload.audioBase64 || typeof payload.audioBase64 !== 'string') {
@@ -43,7 +44,11 @@ export async function POST(req: Request) {
     typeof payload.language === 'string' && payload.language.trim()
       ? payload.language.trim()
       : 'en'
-  const text = await transcribeAudio(payload.audioBase64, format, language)
+  const prompt =
+    typeof payload.prompt === 'string' && payload.prompt.trim()
+      ? payload.prompt.trim()
+      : undefined
+  const text = await transcribeAudio(payload.audioBase64, format, language, prompt)
 
   if (!text) {
     return Response.json({ error: 'transcribe_failed' }, { status: 500 })

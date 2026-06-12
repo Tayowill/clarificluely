@@ -1572,6 +1572,10 @@ export default function Overlay() {
     const message = query.trim()
     setQuery('')
 
+    if (tourStep === 'enter') {
+      void window.electronAPI.invoke('onboarding:tutorial-signal', { type: 'enter' })
+    }
+
     if ((isSessionRecap || isAudioSessionDetail) && viewingAudioSession) {
       await handleAudioSessionChatSubmit(message)
       return

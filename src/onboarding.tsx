@@ -169,7 +169,7 @@ function PreviewPanel({ step, mockOffset, onPreviewListen, onPreviewStealth }: P
         highlight="toolbar"
         footer={
           <LiveTourHint>
-            Press <strong>⌘⇧Space</strong> on the live bar to show or hide Clarifi any time.
+            Press <strong>⌘F</strong> on the live bar to show or hide Clarifi any time.
           </LiveTourHint>
         }
       />
@@ -178,7 +178,7 @@ function PreviewPanel({ step, mockOffset, onPreviewListen, onPreviewStealth }: P
 
   if (step === 'tour-ask') {
     return (
-      <OverlayMock placeholder="What's on my screen?" highlight="input" footer={<LiveTourHint>Type a question in the live bar, then press <strong>⌘↵</strong> to submit.</LiveTourHint>} />
+      <OverlayMock placeholder="What's on my screen?" highlight="input" footer={<LiveTourHint>Type a question in the live bar, then press <strong>Enter</strong> to submit.</LiveTourHint>} />
     )
   }
 
@@ -280,7 +280,7 @@ function PreviewPanel({ step, mockOffset, onPreviewListen, onPreviewStealth }: P
         <div className="preview-complete-icon">✓</div>
         <h3>You&apos;re ready</h3>
         <p style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-          Press <strong>⌘⇧Space</strong> whenever you need Clarifi. Replay this tour anytime from
+          Press <strong>⌘F</strong> whenever you need Clarifi. Replay this tour anytime from
           Settings.
         </p>
       </div>
@@ -599,11 +599,6 @@ export default function OnboardingApp() {
         {permissions.allGranted && (
           <p className="onboarding-status-text success">All permissions granted</p>
         )}
-        <div className="onboarding-permission-note">
-          <strong>Accessibility not sticking?</strong> Quit Clarifi completely after enabling it in
-          System Settings, then reopen from Applications. Permissions are tied to the exact app you
-          installed.
-        </div>
       </>
     )
     if (permissions.allGranted) {
@@ -656,9 +651,7 @@ export default function OnboardingApp() {
         <div className="onboarding-press-row">
           <span className="onboarding-kbd">⌘</span>
           <span className="onboarding-kbd-plus">+</span>
-          <span className="onboarding-kbd">⇧</span>
-          <span className="onboarding-kbd-plus">+</span>
-          <span className="onboarding-kbd">Space</span>
+          <span className="onboarding-kbd">F</span>
         </div>
       </>
     )
@@ -669,7 +662,7 @@ export default function OnboardingApp() {
         onClick={goNext}
         disabled={!tutorialDone}
       >
-        {tutorialDone ? 'Continue' : 'Press ⌘⇧Space on the live bar'}
+        {tutorialDone ? 'Continue' : 'Press ⌘F on the live bar'}
         {tutorialDone && <span>›</span>}
       </button>
     )
@@ -682,8 +675,6 @@ export default function OnboardingApp() {
           enable screen access in a later step.
         </p>
         <div className="onboarding-press-row">
-          <span className="onboarding-kbd">⌘</span>
-          <span className="onboarding-kbd-plus">+</span>
           <span className="onboarding-kbd">↵</span>
         </div>
       </>
@@ -695,7 +686,7 @@ export default function OnboardingApp() {
         onClick={goNext}
         disabled={!tutorialDone}
       >
-        {tutorialDone ? 'Continue' : 'Submit a question with ⌘↵'}
+        {tutorialDone ? 'Continue' : 'Submit a question with Enter'}
         {tutorialDone && <span>›</span>}
       </button>
     )
@@ -847,7 +838,7 @@ export default function OnboardingApp() {
       <>
         <h2 className="onboarding-heading">You&apos;re all set</h2>
         <p className="onboarding-sub">
-          Clarifi is ready. Press <strong>⌘⇧Space</strong> whenever you need it. Replay this tour
+          Clarifi is ready. Press <strong>⌘F</strong> whenever you need it. Replay this tour
           from Settings → Replay product tour.
         </p>
       </>

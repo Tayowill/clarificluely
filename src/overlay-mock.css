@@ -14,7 +14,7 @@
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  overflow: visible;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -62,23 +62,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  min-height: 44px;
+  gap: 4px;
+  padding: 6px 10px;
+  min-height: 40px;
 }
 
 .overlay-mock-toolbar-left,
 .overlay-mock-toolbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overlay-mock-toolbar-left {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.overlay-mock-toolbar-right {
+  flex: 0 0 auto;
 }
 
 .overlay-mock-brand {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
   letter-spacing: 0.04em;
-  margin-right: 2px;
+  margin-right: 0;
+  flex-shrink: 0;
 }
 
 .overlay-mock-dot {
@@ -101,17 +113,19 @@
 
 .overlay-mock-divider {
   width: 1px;
-  height: 20px;
+  height: 18px;
   background: rgba(255, 255, 255, 0.15);
-  margin: 0 6px;
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .overlay-mock-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -176,14 +190,16 @@ button.overlay-mock-icon:hover {
 .overlay-mock-history {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.55);
-  font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 8px;
+  font-size: 10px;
+  padding: 4px 5px;
+  border-radius: 6px;
   pointer-events: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .overlay-mock-chevron {
@@ -272,13 +288,14 @@ button.overlay-mock-icon:hover {
 }
 
 .overlay-mock-mode-pill {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
-  padding: 5px 8px;
-  border-radius: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.75);
+  flex-shrink: 0;
 }
 
 .overlay-mock-tour-highlight {

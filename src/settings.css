@@ -964,6 +964,12 @@ body,
   padding-top: 2px;
 }
 
+.settings-model-divider {
+  height: 1px;
+  margin: 8px 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .settings-model-row {
   display: flex;
   align-items: center;

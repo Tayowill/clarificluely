@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveAuthNext } from '@/lib/auth-next'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
+import { shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
 import { isPublicPath } from '@/lib/protected-routes'
+import { shouldBlockLivePreview } from '@/lib/site-preview'
+import { isLaunchLive } from '@/lib/waitlist-config'
 
 function getSupabaseEnv() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
@@ -19,6 +22,10 @@ export default async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
 
   if (pathname.startsWith('/preview')) {
+    return NextResponse.redirect(new URL('/live', request.url))
+  }
+
+  if (pathname === '/live' && shouldBlockLivePreview(request.nextUrl.hostname)) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -67,9 +74,21 @@ export default async function proxy(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
+    if (shouldBlockPrelaunchAccess(pathname, user?.id)) {
+      const home = new URL('/', request.url)
+      if (user) home.searchParams.set('joined', '1')
+      const redirectResponse = NextResponse.redirect(home)
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie)
+      })
+      return redirectResponse
+    }
+
     if (pathname === '/sign-in' || pathname === '/sign-up') {
       if (user) {
-        const dest = resolveAuthNext(searchParams.get('next'), '/dashboard')
+        const dest = isLaunchLive()
+          ? resolveAuthNext(searchParams.get('next'), '/dashboard')
+          : '/?joined=1'
         const redirectResponse = NextResponse.redirect(new URL(dest, request.url))
         response.cookies.getAll().forEach((cookie) => {
           redirectResponse.cookies.set(cookie)

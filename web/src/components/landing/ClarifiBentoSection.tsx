@@ -2,79 +2,6 @@
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { OverlayDemo } from './OverlayDemo'
-import { MacBookMock } from './MacBookMock'
-import { RecordingTimer } from './RecordingTimer'
-
-function MenuBarMock() {
-  return (
-    <div className="bento-menubar">
-      <div className="bento-menubar-left">
-        <span className="bento-menubar-apple" aria-hidden>
-          
-        </span>
-        <span className="bento-menubar-app">Clarifi</span>
-      </div>
-      <div className="bento-menubar-right">
-        <span className="bento-menubar-recording">
-          <span className="bento-rec-dot" />
-          Recording
-        </span>
-        <span className="bento-menubar-timer">
-          <RecordingTimer />
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function AskClarifiScreen() {
-  return (
-    <div className="bento-app-screen">
-      <MenuBarMock />
-      <div className="bento-app-body">
-        <aside className="bento-sidebar">
-          <p className="bento-sidebar-label">Sessions</p>
-          <button type="button" className="bento-sidebar-item active">
-            Sales call · Today
-          </button>
-          <button type="button" className="bento-sidebar-item">
-            Product review
-          </button>
-          <button type="button" className="bento-sidebar-item">
-            Team sync
-          </button>
-        </aside>
-        <div className="bento-chat-main">
-          <div className="bento-chat-thread">
-            <div className="bento-chat-user">
-              What were my action items from yesterday&apos;s call?
-            </div>
-            <div className="bento-chat-assist">
-              <Image src="/clarifi-logo.png" alt="" width={14} height={14} />
-              <span className="bento-gathering-text">Gathering insights from your session…</span>
-              <span className="bento-spark" aria-hidden>
-                ✨
-              </span>
-            </div>
-            <div className="bento-chat-reply">
-              <p className="bento-chat-reply-label">Action items</p>
-              <ul>
-                <li>Send the one-pager with timeline and pricing</li>
-                <li>Schedule a 2-week pilot kickoff</li>
-                <li>Confirm CRM integration requirements</li>
-              </ul>
-            </div>
-          </div>
-          <div className="bento-chat-input">Ask Clarifi anything…</div>
-        </div>
-      </div>
-      <div className="bento-overlay-slot">
-        <OverlayDemo size="sm" />
-      </div>
-    </div>
-  )
-}
 
 function RecordMeetingsCard() {
   return (
@@ -176,9 +103,15 @@ export function ClarifiBentoSection() {
               Clarifi searches your meetings, transcripts, and screen context to answer questions
               and help you create follow-ups, recaps, and next steps.
             </p>
-            <MacBookMock size="lg">
-              <AskClarifiScreen />
-            </MacBookMock>
+            <div className="bento-ask-macbook-visual">
+              <Image
+                src="/bento-ask-clarifi-macbook-v2.jpg"
+                alt="Clarifi overlay on Google Meet during a screen share on Mac"
+                fill
+                className="bento-ask-macbook-img"
+                sizes="(max-width: 768px) 100vw, 720px"
+              />
+            </div>
           </article>
 
           <article className="clarifi-bento-card clarifi-bento-live" data-reveal>

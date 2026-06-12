@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { AUTH_NEXT_COOKIE, resolveAuthNext } from '@/lib/auth-next'
+import { resolvePrelaunchAuthNext } from '@/lib/prelaunch'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
 
@@ -19,16 +20,19 @@ export async function GET(request: Request) {
   const type = searchParams.get('type') as EmailOtpType | null
   const cookieStore = await cookies()
   const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
-  const safeNext = resolveAuthNext(
-    searchParams.get('next') ?? (authNextCookie ? decodeURIComponent(authNextCookie) : null),
-    '/dashboard',
+  const safeNext = resolvePrelaunchAuthNext(
+    resolveAuthNext(
+      searchParams.get('next') ?? (authNextCookie ? decodeURIComponent(authNextCookie) : null),
+      '/dashboard',
+    ),
   )
 
   if (!tokenHash || !type || !getSupabaseEnv()) {
     return buildRedirect(request, '/sign-in?error=auth')
   }
 
-  let response = buildRedirect(request, safeNext)
+  const successPath = safeNext === '/?joined=1' ? '/?joined=1' : safeNext
+  let response = buildRedirect(request, successPath)
   const supabase = await createRouteHandlerClient(response)
   if (!supabase) {
     return buildRedirect(request, '/sign-in?error=auth')

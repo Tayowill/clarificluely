@@ -6,6 +6,11 @@ import {
   DEFAULT_MODES,
   isBuiltinModeId,
 } from './modes/defaultModes'
+import {
+  BUILTIN_MODELS as SHARED_BUILTIN_MODELS,
+  DEFAULT_ACTIVE_MODEL_ID as SHARED_DEFAULT_ACTIVE_MODEL_ID,
+  type BuiltinModel,
+} from '../shared/builtin-models'
 import { deleteKey, getKey, saveKey } from './store'
 
 export type ModelProvider = 'anthropic' | 'openai' | 'gemini' | 'groq' | 'custom'
@@ -33,6 +38,7 @@ export type UserPreferences = {
   models: ModelConfig[]
   activeModeId: string
   modes: ModeConfig[]
+  showModelInToolbar: boolean
 }
 
 export type PublicModelConfig = Omit<ModelConfig, never>
@@ -41,173 +47,17 @@ export type PublicPreferences = {
   models: PublicModelConfig[]
   activeModeId: string
   modes: ModeConfig[]
+  showModelInToolbar: boolean
 }
 
 const PREFS_FILE = 'user-preferences.json'
 
-const BUILTIN_MODELS: ModelConfig[] = [
-  {
-    id: 'claude-haiku-4-5',
-    label: 'Claude Haiku 4.5',
-    provider: 'anthropic',
-    modelId: 'claude-haiku-4-5-20251001',
-    builtin: true,
-  },
-  {
-    id: 'claude-sonnet-4-6',
-    label: 'Claude Sonnet 4.6',
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-4-6',
-    builtin: true,
-  },
-  {
-    id: 'claude-sonnet-4-5',
-    label: 'Claude Sonnet 4.5',
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-4-5-20250929',
-    builtin: true,
-  },
-  {
-    id: 'claude-sonnet-4',
-    label: 'Claude Sonnet 4',
-    provider: 'anthropic',
-    modelId: 'claude-sonnet-4-20250514',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4-8',
-    label: 'Claude Opus 4.8',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-8',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4-7',
-    label: 'Claude Opus 4.7',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-7',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4-6',
-    label: 'Claude Opus 4.6',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-6',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4-5',
-    label: 'Claude Opus 4.5',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-5-20251101',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4-1',
-    label: 'Claude Opus 4.1',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-1-20250805',
-    builtin: true,
-  },
-  {
-    id: 'claude-opus-4',
-    label: 'Claude Opus 4',
-    provider: 'anthropic',
-    modelId: 'claude-opus-4-20250514',
-    builtin: true,
-  },
-  {
-    id: 'gpt-4o',
-    label: 'GPT-4o',
-    provider: 'openai',
-    modelId: 'gpt-4o',
-    builtin: true,
-  },
-  {
-    id: 'gpt-4o-mini',
-    label: 'GPT-4o Mini',
-    provider: 'openai',
-    modelId: 'gpt-4o-mini',
-    builtin: true,
-  },
-  {
-    id: 'gpt-4-1',
-    label: 'GPT-4.1',
-    provider: 'openai',
-    modelId: 'gpt-4.1',
-    builtin: true,
-  },
-  {
-    id: 'gpt-4-1-mini',
-    label: 'GPT-4.1 Mini',
-    provider: 'openai',
-    modelId: 'gpt-4.1-mini',
-    builtin: true,
-  },
-  {
-    id: 'gpt-4-1-nano',
-    label: 'GPT-4.1 Nano',
-    provider: 'openai',
-    modelId: 'gpt-4.1-nano',
-    builtin: true,
-  },
-  {
-    id: 'o3-mini',
-    label: 'o3-mini',
-    provider: 'openai',
-    modelId: 'o3-mini',
-    builtin: true,
-  },
-  {
-    id: 'o4-mini',
-    label: 'o4-mini',
-    provider: 'openai',
-    modelId: 'o4-mini',
-    builtin: true,
-  },
-  {
-    id: 'gemini-2-5-flash',
-    label: 'Gemini 2.5 Flash',
-    provider: 'gemini',
-    modelId: 'gemini-2.5-flash',
-    builtin: true,
-  },
-  {
-    id: 'gemini-2-5-pro',
-    label: 'Gemini 2.5 Pro',
-    provider: 'gemini',
-    modelId: 'gemini-2.5-pro',
-    builtin: true,
-  },
-  {
-    id: 'gemini-2-0-flash',
-    label: 'Gemini 2.0 Flash',
-    provider: 'gemini',
-    modelId: 'gemini-2.0-flash',
-    builtin: true,
-  },
-  {
-    id: 'gemini-2-0-flash-lite',
-    label: 'Gemini 2.0 Flash Lite',
-    provider: 'gemini',
-    modelId: 'gemini-2.0-flash-lite',
-    builtin: true,
-  },
-  {
-    id: 'gemini-1-5-flash',
-    label: 'Gemini 1.5 Flash',
-    provider: 'gemini',
-    modelId: 'gemini-1.5-flash',
-    builtin: true,
-  },
-  {
-    id: 'gemini-1-5-pro',
-    label: 'Gemini 1.5 Pro',
-    provider: 'gemini',
-    modelId: 'gemini-1.5-pro',
-    builtin: true,
-  },
-]
+const DEFAULT_ACTIVE_MODEL_ID = SHARED_DEFAULT_ACTIVE_MODEL_ID
+
+const BUILTIN_MODELS: ModelConfig[] = SHARED_BUILTIN_MODELS.map((model: BuiltinModel) => ({
+  ...model,
+  builtin: true,
+}))
 
 function prefsPath(): string {
   return path.join(app.getPath('userData'), PREFS_FILE)
@@ -215,10 +65,11 @@ function prefsPath(): string {
 
 function defaultPreferences(): UserPreferences {
   return {
-    activeModelId: BUILTIN_MODELS[0].id,
+    activeModelId: DEFAULT_ACTIVE_MODEL_ID,
     models: [...BUILTIN_MODELS],
     activeModeId: 'general',
     modes: DEFAULT_MODES.map((m) => ({ ...m })),
+    showModelInToolbar: false,
   }
 }
 
@@ -256,14 +107,20 @@ export function loadUserPreferences(): UserPreferences {
     const raw = fs.readFileSync(prefsPath(), 'utf-8')
     const parsed = JSON.parse(raw) as Partial<UserPreferences>
     const defaults = defaultPreferences()
+    const models = Array.isArray(parsed.models)
+      ? mergeModels(parsed.models)
+      : defaults.models
+    const modelIds = new Set(models.map((m) => m.id))
+    let activeModelId =
+      typeof parsed.activeModelId === 'string' ? parsed.activeModelId : defaults.activeModelId
+    if (!modelIds.has(activeModelId)) {
+      activeModelId = modelIds.has(DEFAULT_ACTIVE_MODEL_ID)
+        ? DEFAULT_ACTIVE_MODEL_ID
+        : (models[0]?.id ?? DEFAULT_ACTIVE_MODEL_ID)
+    }
     cached = {
-      activeModelId:
-        typeof parsed.activeModelId === 'string'
-          ? parsed.activeModelId
-          : defaults.activeModelId,
-      models: Array.isArray(parsed.models)
-        ? mergeModels(parsed.models)
-        : defaults.models,
+      activeModelId,
+      models,
       activeModeId:
         typeof parsed.activeModeId === 'string'
           ? parsed.activeModeId
@@ -271,6 +128,10 @@ export function loadUserPreferences(): UserPreferences {
       modes: Array.isArray(parsed.modes)
         ? mergeModes(parsed.modes)
         : defaults.modes,
+      showModelInToolbar:
+        typeof parsed.showModelInToolbar === 'boolean'
+          ? parsed.showModelInToolbar
+          : defaults.showModelInToolbar,
     }
     syncActiveModeFlag(cached)
     return cached
@@ -310,6 +171,7 @@ export function toPublicPreferences(prefs: UserPreferences): PublicPreferences {
     })),
     activeModeId: prefs.activeModeId,
     modes: prefs.modes.map((m) => ({ ...m })),
+    showModelInToolbar: prefs.showModelInToolbar,
   }
 }
 
@@ -317,6 +179,7 @@ export function getActiveModel(prefs = loadUserPreferences()): ModelConfig {
   return (
     prefs.models.find((m) => m.id === prefs.activeModelId) ??
     prefs.models[0] ??
+    BUILTIN_MODELS.find((m) => m.id === DEFAULT_ACTIVE_MODEL_ID) ??
     BUILTIN_MODELS[0]
   )
 }
@@ -369,6 +232,13 @@ export async function addCustomModel(input: {
   prefs.models.push(model)
   saveUserPreferences(prefs)
   return model
+}
+
+export function setShowModelInToolbar(show: boolean): PublicPreferences {
+  const prefs = loadUserPreferences()
+  prefs.showModelInToolbar = show
+  saveUserPreferences(prefs)
+  return toPublicPreferences(prefs)
 }
 
 export function setActiveModel(modelId: string): PublicPreferences {
@@ -434,7 +304,7 @@ export async function removeCustomModel(modelId: string): Promise<PublicPreferen
   if (!model || model.builtin) return toPublicPreferences(prefs)
   prefs.models = prefs.models.filter((m) => m.id !== modelId)
   if (prefs.activeModelId === modelId) {
-    prefs.activeModelId = BUILTIN_MODELS[0].id
+    prefs.activeModelId = DEFAULT_ACTIVE_MODEL_ID
   }
   await deleteKey(`model:${model.id}`)
   saveUserPreferences(prefs)

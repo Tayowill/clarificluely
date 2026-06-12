@@ -81,11 +81,13 @@ export async function proxyTranscribe(
   audioBase64: string,
   format: 'wav' | 'webm',
   language = 'en',
+  prompt?: string,
 ): Promise<string | null> {
   const { ok, status, data } = await proxyFetch('/api/llm/transcribe', {
     audioBase64,
     format,
     language,
+    ...(prompt ? { prompt } : {}),
   })
 
   if (status === 401 || status === 429 || !ok) return null

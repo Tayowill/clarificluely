@@ -1880,6 +1880,20 @@
   flex-direction: column;
 }
 
+.bento-ask-macbook-visual {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1024 / 771;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #e8e6f2;
+}
+
+.bento-ask-macbook-img {
+  object-fit: cover;
+  object-position: center;
+}
+
 .clarifi-bento-main-col [data-reveal]:nth-child(1) {
   transition-delay: 0s;
 }

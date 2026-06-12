@@ -6,6 +6,29 @@ import './screen-share-compare.css'
 
 type SceneVariant = 'yours' | 'others'
 
+function CompareToolbar() {
+  return (
+    <div className="ssc-toolbar" aria-hidden>
+      <div className="ssc-toolbar-left">
+        <span className="ssc-toolbar-dot" />
+        <span className="ssc-toolbar-brand">Clarifi</span>
+        <span className="ssc-toolbar-pill">General</span>
+        <span className="ssc-toolbar-icon">▣</span>
+      </div>
+      <div className="ssc-toolbar-mid">
+        <span className="ssc-toolbar-btn ssc-toolbar-btn-green">◉</span>
+        <span className="ssc-toolbar-btn ssc-toolbar-btn-blue">▦</span>
+      </div>
+      <div className="ssc-toolbar-right">
+        <span className="ssc-toolbar-icon">⫶</span>
+        <span className="ssc-toolbar-icon">▮▮</span>
+        <span className="ssc-toolbar-menu">Sessions ▾</span>
+        <span className="ssc-toolbar-menu">History ▾</span>
+      </div>
+    </div>
+  )
+}
+
 function CodeLines({ variant }: { variant: SceneVariant }) {
   const redactedWidths = [92, 78, 85, 62, 88, 70, 95, 58, 82, 74, 90, 65, 80, 72]
 
@@ -85,7 +108,6 @@ function AssistCard() {
   )
 }
 
-/** Identical layout in both layers — only content differs */
 function CompareScene({ variant }: { variant: SceneVariant }) {
   return (
     <div className="ssc-compose">
@@ -148,42 +170,44 @@ export function ScreenShareCompare() {
           dragging.current = false
         }}
       >
-        <span className="ssc-label ssc-label-left">Visible to you</span>
-        <span className="ssc-label ssc-label-right">Invisible to others</span>
+        <CompareToolbar />
 
-        {/* Bottom: what screen share shows — full scene, always visible */}
-        <div className="ssc-layer ssc-layer-base">
-          <CompareScene variant="others" />
-        </div>
+        <span className="ssc-label ssc-label-left">Visible to you (private)</span>
+        <span className="ssc-label ssc-label-right">Invisible to others (secure)</span>
 
-        {/* Top: what you see — same layout, clipped at divider */}
-        <div className="ssc-layer ssc-layer-reveal" style={{ width: `${pos}%` }}>
-          <div className="ssc-layer-reveal-inner" style={{ width: revealInnerWidth }}>
-            <div className="ssc-reveal-frame" aria-hidden />
-            <CompareScene variant="yours" />
+        <div className="ssc-compare-area">
+          <div className="ssc-layer ssc-layer-base">
+            <CompareScene variant="others" />
           </div>
+
+          <div className="ssc-layer ssc-layer-reveal" style={{ width: `${pos}%` }}>
+            <div className="ssc-layer-reveal-inner" style={{ width: revealInnerWidth }}>
+              <div className="ssc-reveal-frame" aria-hidden />
+              <CompareScene variant="yours" />
+            </div>
+          </div>
+
+          <div className="ssc-vline" style={{ left: `${pos}%` }} aria-hidden />
+
+          <button
+            type="button"
+            className="ssc-handle"
+            style={{ left: `${pos}%` }}
+            aria-label="Drag to compare your view with screen share"
+            onPointerDown={(e) => {
+              dragging.current = true
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setFromClientX(e.clientX)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') setPos((p) => Math.max(8, p - 4))
+              if (e.key === 'ArrowRight') setPos((p) => Math.min(92, p + 4))
+            }}
+          >
+            <span>‹</span>
+            <span>›</span>
+          </button>
         </div>
-
-        <div className="ssc-vline" style={{ left: `${pos}%` }} aria-hidden />
-
-        <button
-          type="button"
-          className="ssc-handle"
-          style={{ left: `${pos}%` }}
-          aria-label="Drag to compare your view with screen share"
-          onPointerDown={(e) => {
-            dragging.current = true
-            e.currentTarget.setPointerCapture(e.pointerId)
-            setFromClientX(e.clientX)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowLeft') setPos((p) => Math.max(8, p - 4))
-            if (e.key === 'ArrowRight') setPos((p) => Math.min(92, p + 4))
-          }}
-        >
-          <span>‹</span>
-          <span>›</span>
-        </button>
       </div>
     </div>
   )

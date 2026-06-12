@@ -42,6 +42,14 @@ export async function getGroqApiKey(): Promise<string | null> {
   return getKey('groq')
 }
 
+export async function getDeepgramApiKey(): Promise<string | null> {
+  loadRuntimeEnv()
+  if (process.env.DEEPGRAM_API_KEY?.trim()) {
+    return process.env.DEEPGRAM_API_KEY.trim()
+  }
+  return getKey('deepgram')
+}
+
 export async function getOpenAiApiKey(): Promise<string | null> {
   loadRuntimeEnv()
   if (process.env.OPENAI_API_KEY?.trim()) {

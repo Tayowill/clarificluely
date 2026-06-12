@@ -5,6 +5,8 @@ import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
+import { resolvePrelaunchAuthNext } from '@/lib/prelaunch'
+import { isLaunchLive } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
 
 export const dynamic = 'force-dynamic'
@@ -33,13 +35,14 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const cookieStore = await cookies()
   const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
-  const safeNext = resolveNextParam(searchParams, authNextCookie)
+  const rawNext = resolveNextParam(searchParams, authNextCookie)
+  const waitlistFlow = isWaitlistRedirect(rawNext) || !isLaunchLive()
+  const successPath = waitlistFlow ? '/?joined=1' : resolvePrelaunchAuthNext(rawNext)
 
   if (!code || !getSupabaseEnv()) {
     return buildRedirect(request, '/sign-in?error=auth')
   }
 
-  const successPath = isWaitlistRedirect(safeNext) ? '/?joined=1' : safeNext
   let response = buildRedirect(request, successPath)
 
   const supabase = await createRouteHandlerClient(response)
@@ -53,9 +56,9 @@ export async function GET(request: Request) {
     console.error('auth callback exchange failed:', error.message)
     return buildRedirect(
       request,
-      isWaitlistRedirect(safeNext)
+      waitlistFlow
         ? '/?error=auth'
-        : `/sign-in?next=${encodeURIComponent(safeNext)}&error=auth`,
+        : `/sign-in?next=${encodeURIComponent(rawNext)}&error=auth`,
     )
   }
 
@@ -69,7 +72,7 @@ export async function GET(request: Request) {
 
   const admin = getSupabaseAdmin()
 
-  if (isWaitlistRedirect(safeNext)) {
+  if (waitlistFlow) {
     if (admin) {
       const { error: insertError } = await admin.from('waitlist_signups').upsert(
         { user_id: user.id, email: user.email },

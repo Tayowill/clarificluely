@@ -12,6 +12,8 @@ export type SettingsTab =
   | 'integrations'
   | 'keybinds'
   | 'audio'
+  | 'audio_sessions'
+  | 'history'
 
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   'profile',
@@ -20,6 +22,8 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   'integrations',
   'keybinds',
   'audio',
+  'audio_sessions',
+  'history',
 ] as const
 
 export function isSettingsTab(value: unknown): value is SettingsTab {

@@ -1,5 +1,7 @@
 const PUBLIC_PREFIXES = [
   '/',
+  '/prelaunch',
+  '/live',
   '/sitemap.xml',
   '/robots.txt',
   '/auth/callback',

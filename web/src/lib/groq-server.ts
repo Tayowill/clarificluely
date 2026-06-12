@@ -2,6 +2,7 @@ export async function transcribeAudio(
   audioBase64: string,
   format: 'wav' | 'webm' = 'webm',
   language = 'en',
+  prompt?: string,
 ): Promise<string | null> {
   const apiKey = process.env.GROQ_API_KEY?.trim()
   if (!apiKey) {
@@ -23,6 +24,10 @@ export async function transcribeAudio(
   if (language && language !== 'auto') {
     formData.append('language', language)
   }
+  if (prompt?.trim()) {
+    formData.append('prompt', prompt.trim().slice(-220))
+  }
+  formData.append('temperature', '0')
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
