@@ -252,12 +252,11 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content waitlist-hero-content" data-reveal>
           <h1 className="waitlist-hero-title">
-            The Unfair Advantage For{' '}
+            The #1 Advantage For{' '}
             <span className="waitlist-hero-title-accent">Every Sales Call</span>.
           </h1>
           <p>
-            Clarifi listens to your sales calls in real time, delivers instant assistance,
-            handles objections, and takes perfect notes — all completely invisible on screen
+            Clarifi provides real-time assistance on every sales call. Invisible on screen
             share.
           </p>
           <JoinWaitlistButton onClick={scrollToJoin} large />
