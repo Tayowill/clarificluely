@@ -97,6 +97,54 @@
   color: #fff;
 }
 
+.pricing-billing-toggle {
+  display: inline-flex;
+  padding: 0.3rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--cl-border);
+  border-radius: 9999px;
+  box-shadow: 0 4px 20px rgba(26, 26, 46, 0.06);
+}
+
+.pricing-billing-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--cl-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.55rem 1.35rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pricing-savings-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  white-space: nowrap;
+}
+
+.pricing-billing-toggle button.active .pricing-savings-pill {
+  background: rgba(255, 255, 255, 0.15);
+  color: #bbf7d0;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.pricing-billing-toggle button.active {
+  background: var(--cl-navy);
+  color: #fff;
+}
+
 .pricing-billing-note {
   font-size: 0.85rem;
   color: var(--cl-muted);
@@ -104,10 +152,10 @@
 
 .pricing-cards {
   position: relative;
-  max-width: 1100px;
+  max-width: 900px;
   margin: 0 auto 4rem;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   align-items: stretch;
 }
@@ -129,7 +177,16 @@
 
 .pricing-card-head {
   margin-bottom: 1.25rem;
-  min-height: 5.25rem;
+  min-height: 6.5rem;
+}
+
+.pricing-card-audience {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cl-muted);
+  margin-bottom: 0.35rem;
 }
 
 .pricing-card-name {
@@ -165,6 +222,19 @@
 .pricing-card-period {
   font-size: 0.95rem;
   color: var(--cl-muted);
+}
+
+.pricing-card-billed {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--cl-muted);
+}
+
+.pricing-card-savings {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #047857;
 }
 
 .pricing-card-cta {
@@ -271,7 +341,7 @@
 .pricing-compare-header,
 .pricing-compare-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.35fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(200px, 1.35fr) repeat(2, minmax(0, 1fr));
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;

@@ -8,8 +8,8 @@ export const FAQ_ITEMS = [
     a: 'Sales calls, interviews, client meetings, lectures — anyone who wants an invisible AI co-pilot in the moment.',
   },
   {
-    q: 'Is Clarifi free?',
-    a: 'Yes. Start free with 5 sessions per day. Upgrade to Pro for unlimited sessions and advanced features.',
+    q: 'Is there a free trial?',
+    a: 'Yes. Both Pro and Pro+ include a 7-day free trial on monthly and annual billing. Cancel anytime before the trial ends.',
   },
   {
     q: 'How is it undetectable in meetings?',

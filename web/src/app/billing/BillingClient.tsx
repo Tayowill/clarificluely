@@ -1,0 +1,178 @@
+'use client'
+
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import type { BillingInterval } from '@/lib/pricing'
+import { annualSavings, maxAnnualSavingsPercent } from '@/lib/pricing'
+
+const plans = [
+  {
+    id: 'pro' as const,
+    name: 'Pro',
+    audience: 'Individual',
+    monthlyPrice: '$19',
+    annualPrice: '$15',
+    period: '/ month',
+    annualNote: 'Billed $180 annually',
+    features: [
+      '7-day free trial',
+      'Unlimited AI responses',
+      'Unlimited meeting notetaking',
+      'Unlimited custom prompting',
+      'Custom keybinds',
+      'Priority support',
+    ],
+  },
+  {
+    id: 'pro_plus' as const,
+    name: 'Pro+',
+    audience: 'Team',
+    monthlyPrice: '$39',
+    annualPrice: '$29',
+    period: '/ seat / month',
+    annualNote: 'Billed $348 per seat annually',
+    features: [
+      '7-day free trial',
+      'Everything in Pro',
+      'Undetectability to screen share',
+      'Invisible on Zoom, Meet, and Teams',
+      'Team-ready seats',
+      'Priority support',
+    ],
+  },
+]
+
+export default function BillingClient() {
+  const searchParams = useSearchParams()
+  const [interval, setInterval] = useState<BillingInterval>('monthly')
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fromQuery = searchParams.get('interval')
+    if (fromQuery === 'annual' || fromQuery === 'monthly') {
+      setInterval(fromQuery)
+    }
+  }, [searchParams])
+
+  async function startCheckout(plan: 'pro' | 'pro_plus') {
+    setLoadingPlan(plan)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, interval }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) {
+        setError(data.error || 'Checkout unavailable — configure Stripe price IDs')
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setError('Network error — try again')
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-black text-white">
+      <nav className="flex items-center justify-between px-8 py-6 border-b border-white/10">
+        <Link href="/dashboard" className="text-xl font-bold">
+          Clarifi
+        </Link>
+        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
+          ← Back to dashboard
+        </Link>
+      </nav>
+
+      <div className="max-w-4xl mx-auto px-8 py-12">
+        <h1 className="text-3xl font-bold mb-2">Choose your plan</h1>
+        <p className="text-white/50 mb-6">
+          Start with a 7-day free trial. Clarifi runs through our secure API proxy — you subscribe
+          here, not with your own keys.
+        </p>
+
+        <div className="inline-flex p-1 mb-10 rounded-full border border-white/15 bg-white/5">
+          <button
+            type="button"
+            onClick={() => setInterval('monthly')}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition ${
+              interval === 'monthly' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setInterval('annual')}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition ${
+              interval === 'annual' ? 'bg-white text-black' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Annual
+            <span className="ml-2 text-xs font-semibold text-emerald-400">
+              Save up to {maxAnnualSavingsPercent()}%
+            </span>
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-400 mb-6 border border-red-400/30 rounded-lg p-4">
+            {error}
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {plans.map((plan) => {
+            const price = interval === 'annual' ? plan.annualPrice : plan.monthlyPrice
+            return (
+              <div
+                key={plan.id}
+                className={`p-6 rounded-2xl border ${
+                  plan.id === 'pro_plus' ? 'border-white bg-white/5' : 'border-white/10'
+                }`}
+              >
+                <p className="text-xs uppercase tracking-wide text-white/40 mb-2">{plan.audience}</p>
+                <div className="text-2xl font-bold mb-1">
+                  {price}
+                  <span className="text-base font-normal text-white/50">{plan.period}</span>
+                </div>
+                {interval === 'annual' ? (
+                  <>
+                    <div className="text-sm text-white/40 mb-1">{plan.annualNote}</div>
+                    <div className="text-sm font-medium text-emerald-400 mb-4">
+                      {annualSavings(plan.id).label}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-white/40 mb-4">7-day free trial included</div>
+                )}
+                <div className="font-medium mb-4">{plan.name}</div>
+                <ul className="space-y-2 mb-8">
+                  {plan.features.map((f) => (
+                    <li key={f} className="text-sm text-white/60 flex items-center gap-2">
+                      <span className="text-green-400">✓</span> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => startCheckout(plan.id)}
+                  disabled={loadingPlan === plan.id}
+                  className="w-full py-3 rounded-xl text-sm font-medium bg-white text-black hover:bg-white/90 disabled:opacity-50"
+                >
+                  {loadingPlan === plan.id ? 'Redirecting…' : 'Start 7-day free trial'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </main>
+  )
+}

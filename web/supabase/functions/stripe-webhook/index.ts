@@ -15,8 +15,13 @@ function json(body: unknown, status = 200) {
 
 function planFromPriceId(priceId: string | undefined | null): 'free' | 'pro' | 'pro_plus' {
   if (!priceId) return 'free'
-  if (priceId === Deno.env.get('STRIPE_PRICE_PRO')) return 'pro'
-  if (priceId === Deno.env.get('STRIPE_PRICE_PRO_PLUS')) return 'pro_plus'
+  const proMonthly = Deno.env.get('STRIPE_PRICE_PRO')
+  const proAnnual = Deno.env.get('STRIPE_PRICE_PRO_ANNUAL')
+  const proPlusMonthly = Deno.env.get('STRIPE_PRICE_PRO_PLUS')
+  const proPlusAnnual = Deno.env.get('STRIPE_PRICE_PRO_PLUS_ANNUAL')
+
+  if (priceId === proMonthly || priceId === proAnnual) return 'pro'
+  if (priceId === proPlusMonthly || priceId === proPlusAnnual) return 'pro_plus'
   return 'free'
 }
 

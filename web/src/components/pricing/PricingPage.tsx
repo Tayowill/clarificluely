@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
-import { PRICING_FEATURES, getPricingPlans } from '@/lib/pricing'
+import { type BillingInterval, PRICING_FEATURES, getPricingPlans, maxAnnualSavingsPercent } from '@/lib/pricing'
 import '@/components/landing/landing.css'
 import './pricing.css'
 
@@ -38,8 +38,9 @@ function XIcon() {
 export function PricingPage() {
   const searchParams = useSearchParams()
   const checkoutSuccess = searchParams.get('checkout') === 'success'
-  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
-  const plans = getPricingPlans()
+  const [billing, setBilling] = useState<BillingInterval>('monthly')
+  const plans = getPricingPlans(billing)
+  const maxSavingsPercent = maxAnnualSavingsPercent()
 
   return (
     <div className="landing-root pricing-page">
@@ -56,135 +57,135 @@ export function PricingPage() {
         )}
 
         <section className="pricing-hero" data-reveal>
-          <h1 className="pricing-hero-title">Start for free.</h1>
+          <h1 className="pricing-hero-title">Try Clarifi free for 7 days.</h1>
           <p className="pricing-hero-sub">
-            Get instant access to Clarifi and upgrade every conversation. Unlock Clarifi for your
-            conversations.
+            Pro for individuals. Pro+ for teams. Unlimited AI on every sales call — cancel anytime.
           </p>
 
           <div className="pricing-toggles">
-            <div className="pricing-device-toggle" role="tablist" aria-label="Device">
+            <div className="pricing-billing-toggle" role="tablist" aria-label="Billing interval">
               <button
                 type="button"
                 role="tab"
-                aria-selected={device === 'desktop'}
-                className={device === 'desktop' ? 'active' : ''}
-                onClick={() => setDevice('desktop')}
+                aria-selected={billing === 'monthly'}
+                className={billing === 'monthly' ? 'active' : ''}
+                onClick={() => setBilling('monthly')}
               >
-                Desktop
+                Monthly
               </button>
               <button
                 type="button"
                 role="tab"
-                aria-selected={device === 'mobile'}
-                className={device === 'mobile' ? 'active' : ''}
-                onClick={() => setDevice('mobile')}
+                aria-selected={billing === 'annual'}
+                className={billing === 'annual' ? 'active' : ''}
+                onClick={() => setBilling('annual')}
               >
-                Mobile
+                Annual
+                <span className="pricing-savings-pill">Save up to {maxSavingsPercent}%</span>
               </button>
             </div>
-            <div className="pricing-billing-note">Billed monthly · cancel anytime</div>
+
+            <div className="pricing-billing-note">
+              {billing === 'annual'
+                ? `Save up to ${maxSavingsPercent}% vs monthly · 7-day free trial · cancel anytime`
+                : 'Billed monthly · 7-day free trial · cancel anytime'}
+            </div>
           </div>
         </section>
 
-        {device === 'mobile' ? (
-          <section className="pricing-mobile-soon" data-reveal>
-            <p>Clarifi for mobile is coming soon.</p>
-            <Link href="/#join" className="landing-cta">
-              Join the waitlist
-            </Link>
-          </section>
-        ) : (
-          <>
-            <section className="pricing-cards" data-reveal-group>
-              {plans.map((plan) => (
-                <article
-                  key={plan.id}
-                  className={`pricing-card${plan.id === 'pro_plus' ? ' pricing-card-featured' : ''}`}
-                  data-reveal
-                >
-                  <div className="pricing-card-head">
-                    <h2 className="pricing-card-name">
-                      {plan.name}
-                      {plan.badge ? <span className="pricing-card-badge">{plan.badge}</span> : null}
-                    </h2>
-                    <div className="pricing-card-price">
-                      <span className="pricing-card-amount">{plan.price}</span>
-                      {plan.period ? (
-                        <span className="pricing-card-period">{plan.period}</span>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {plan.id === 'starter' ? (
-                    <Link href={plan.href} className="pricing-card-cta-waitlist">
-                      {plan.cta}
-                    </Link>
-                  ) : (
-                    <a
-                      href={plan.href}
-                      className="pricing-card-cta"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {plan.cta}
-                    </a>
-                  )}
-
-                  <p className="pricing-card-tagline">{plan.tagline}</p>
-
-                  <ul className="pricing-card-features">
-                    {plan.features.map((feature) => (
-                      <li key={feature}>
-                        <span className="pricing-feature-check" aria-hidden>
-                          <CheckIcon />
-                        </span>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </section>
-
-            <section className="pricing-compare" data-reveal>
-              <h2 className="pricing-compare-title">Features</h2>
-              <div className="pricing-compare-grid">
-                <div className="pricing-compare-header">
-                  <span />
-                  <span>Starter</span>
-                  <span>Pro</span>
-                  <span>Pro + Undetectability</span>
+        <section className="pricing-cards" data-reveal-group>
+          {plans.map((plan) => (
+            <article
+              key={plan.id}
+              className={`pricing-card${plan.id === 'pro_plus' ? ' pricing-card-featured' : ''}`}
+              data-reveal
+            >
+              <div className="pricing-card-head">
+                <p className="pricing-card-audience">{plan.audience}</p>
+                <h2 className="pricing-card-name">
+                  {plan.name}
+                  {plan.badge ? <span className="pricing-card-badge">{plan.badge}</span> : null}
+                </h2>
+                <div className="pricing-card-price">
+                  <span className="pricing-card-amount">{plan.price}</span>
+                  {plan.period ? (
+                    <span className="pricing-card-period">{plan.period}</span>
+                  ) : null}
                 </div>
-                {PRICING_FEATURES.map((row) => (
-                  <div key={row.label} className="pricing-compare-row">
-                    <span className="pricing-compare-label">{row.label}</span>
-                    {(['starter', 'pro', 'proPlus'] as const).map((col) => {
-                      const value = row[col]
-                      return (
-                        <span key={col} className="pricing-compare-cell">
-                          {typeof value === 'boolean' ? (
-                            value ? (
-                              <span className="pricing-compare-yes">
-                                <CheckIcon />
-                              </span>
-                            ) : (
-                              <span className="pricing-compare-no">
-                                <XIcon />
-                              </span>
-                            )
-                          ) : (
-                            value
-                          )}
-                        </span>
-                      )
-                    })}
-                  </div>
-                ))}
+                {plan.billedNote ? (
+                  <p className="pricing-card-billed">{plan.billedNote}</p>
+                ) : null}
+                {plan.savingsNote ? (
+                  <p className="pricing-card-savings">{plan.savingsNote}</p>
+                ) : null}
               </div>
-            </section>
-          </>
-        )}
+
+              {plan.external ? (
+                <a
+                  href={plan.href}
+                  className="pricing-card-cta"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {plan.cta}
+                </a>
+              ) : (
+                <Link href={plan.href} className="pricing-card-cta">
+                  {plan.cta}
+                </Link>
+              )}
+
+              <p className="pricing-card-tagline">{plan.tagline}</p>
+
+              <ul className="pricing-card-features">
+                {plan.features.map((feature) => (
+                  <li key={feature}>
+                    <span className="pricing-feature-check" aria-hidden>
+                      <CheckIcon />
+                    </span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))}
+        </section>
+
+        <section className="pricing-compare" data-reveal>
+          <h2 className="pricing-compare-title">Features</h2>
+          <div className="pricing-compare-grid">
+            <div className="pricing-compare-header">
+              <span />
+              <span>Pro · Individual</span>
+              <span>Pro+ · Team</span>
+            </div>
+            {PRICING_FEATURES.map((row) => (
+              <div key={row.label} className="pricing-compare-row">
+                <span className="pricing-compare-label">{row.label}</span>
+                {(['pro', 'proPlus'] as const).map((col) => {
+                  const value = row[col]
+                  return (
+                    <span key={col} className="pricing-compare-cell">
+                      {typeof value === 'boolean' ? (
+                        value ? (
+                          <span className="pricing-compare-yes">
+                            <CheckIcon />
+                          </span>
+                        ) : (
+                          <span className="pricing-compare-no">
+                            <XIcon />
+                          </span>
+                        )
+                      ) : (
+                        value
+                      )}
+                    </span>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   )

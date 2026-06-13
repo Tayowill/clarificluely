@@ -1340,8 +1340,10 @@
 /* ── Pricing ── */
 .landing-pricing-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
+  max-width: 760px;
+  margin: 0 auto;
 }
 
 .landing-pricing-card {
@@ -1373,6 +1375,15 @@
   padding: 4px 12px;
   border-radius: 9999px;
   white-space: nowrap;
+}
+
+.landing-pricing-audience {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.55;
+  margin-bottom: 0.35rem;
 }
 
 .landing-pricing-card h3 {

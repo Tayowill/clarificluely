@@ -1,4 +1,5 @@
 import { getServerUser } from '@/lib/auth-server'
+import type { BillingInterval } from '@/lib/pricing'
 import { getStripe, priceIdForPlan } from '@/lib/stripe'
 
 export async function POST(req: Request) {
@@ -12,7 +13,7 @@ export async function POST(req: Request) {
     return Response.json({ error: 'stripe_not_configured' }, { status: 503 })
   }
 
-  let body: { plan?: 'pro' | 'pro_plus' }
+  let body: { plan?: 'pro' | 'pro_plus'; interval?: BillingInterval }
   try {
     body = await req.json()
   } catch {
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
   }
 
   const plan = body.plan === 'pro_plus' ? 'pro_plus' : 'pro'
-  const priceId = priceIdForPlan(plan)
+  const interval = body.interval === 'annual' ? 'annual' : 'monthly'
+  const priceId = priceIdForPlan(plan, interval)
   if (!priceId) {
     return Response.json({ error: 'price_not_configured' }, { status: 503 })
   }
@@ -37,11 +39,14 @@ export async function POST(req: Request) {
     metadata: {
       userId: user.id,
       plan,
+      interval,
     },
     subscription_data: {
+      trial_period_days: 7,
       metadata: {
         userId: user.id,
         plan,
+        interval,
       },
     },
   })

@@ -52,30 +52,32 @@ const TESTIMONIALS = [
 
 const PRICING_TIERS = [
   {
-    name: 'Free',
-    price: '$0',
-    tagline: 'Try Clarifi on your next call',
-    features: ['5 sessions per day', 'Real-time assist', 'Meeting notes', 'Mac desktop app'],
-    cta: 'download' as const,
-    featured: false,
-  },
-  {
     name: 'Pro',
-    price: '$20',
+    audience: 'Individual',
+    price: '$19',
     period: '/mo',
-    tagline: 'For professionals who live in meetings',
-    features: ['Unlimited sessions', 'Priority support', 'Advanced AI models', 'Transcript export'],
-    cta: 'billing' as const,
-    featured: true,
+    tagline: 'Unlimited AI for solo operators',
+    features: [
+      '7-day free trial',
+      'Unlimited AI responses',
+      'Unlimited meeting notetaking',
+      'Custom keybinds',
+    ],
+    featured: false,
   },
   {
-    name: 'Team',
-    price: '$49',
-    period: '/mo',
-    tagline: 'Shared seats for growing teams',
-    features: ['Everything in Pro', 'Team admin dashboard', 'Usage analytics', 'Dedicated support'],
-    cta: 'billing' as const,
-    featured: false,
+    name: 'Pro+',
+    audience: 'Team',
+    price: '$39',
+    period: '/seat/mo',
+    tagline: 'Undetectable during screen share',
+    features: [
+      '7-day free trial',
+      'Everything in Pro',
+      'Undetectable on screen share',
+      'Team-ready seats',
+    ],
+    featured: true,
   },
 ]
 
@@ -311,12 +313,13 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
       <section className="landing-section landing-section-tint" id="pricing" data-reveal>
         <div className="landing-section-header centered">
           <h2>Simple pricing</h2>
-          <p>Start free. Upgrade when you need more.</p>
+          <p>7-day free trial on every plan. Cancel anytime.</p>
         </div>
         <div className="landing-pricing-grid">
           {PRICING_TIERS.map((tier) => (
             <div key={tier.name} className={`landing-pricing-card ${tier.featured ? 'featured' : ''}`}>
-              {tier.featured && <span className="landing-pricing-badge">Most popular</span>}
+              {tier.featured && <span className="landing-pricing-badge">For teams</span>}
+              <p className="landing-pricing-audience">{tier.audience}</p>
               <h3>{tier.name}</h3>
               <p className="landing-pricing-price">
                 {tier.price}
@@ -328,13 +331,9 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
                   <li key={f}>✓ {f}</li>
                 ))}
               </ul>
-              {tier.cta === 'download' ? (
-                <JoinWaitlistButton onClick={joinWaitlist} className="landing-pricing-cta" />
-              ) : (
-                <Link href="/billing" className="landing-cta landing-pricing-cta">
-                  View plans
-                </Link>
-              )}
+              <Link href="/pricing" className="landing-cta landing-pricing-cta">
+                Start free trial
+              </Link>
             </div>
           ))}
         </div>

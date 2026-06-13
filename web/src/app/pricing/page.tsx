@@ -4,7 +4,7 @@ import { PricingPage } from '@/components/pricing/PricingPage'
 export const metadata = {
   title: 'Pricing — Clarifi',
   description:
-    'Start free on Mac. Upgrade to Pro for unlimited AI and notes, or Pro+ for undetectable screen share.',
+    'Pro for individuals at $19/mo, Pro+ for teams at $39/seat/mo. 7-day free trial on monthly and annual plans.',
   alternates: { canonical: '/pricing' },
 }
 
