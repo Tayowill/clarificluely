@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { ClarifiBentoSection } from '@/components/landing/ClarifiBentoSection'
 import { FaqSection } from '@/components/landing/FaqSection'
-import { CLARIFI_INTRO_REPLY, OverlayDemo } from '@/components/landing/OverlayDemo'
+import { HeroSalesDemo } from '@/components/landing/HeroSalesDemo'
 import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
 import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
@@ -252,8 +252,9 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         <div className="landing-hero-glow landing-hero-glow-b" aria-hidden />
         <div className="landing-hero-content waitlist-hero-content" data-reveal>
           <h1 className="waitlist-hero-title">
-            The #1 Advantage For{' '}
-            <span className="waitlist-hero-title-accent">Every Sales Call</span>.
+            The #1 Ai assistant
+            <br />
+            <span className="waitlist-hero-title-accent">For Every Sales Call.</span>
           </h1>
           <p>
             Clarifi provides real-time assistance on every sales call. Invisible on screen
@@ -262,17 +263,8 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
           <JoinWaitlistButton onClick={scrollToJoin} large />
         </div>
 
-        <div className="landing-hero-widget-wrap" data-reveal>
-          <OverlayDemo
-            size="lg"
-            showQuickPrompts
-            defaultScreen
-            defaultPanelMode="chat"
-            initialMessages={[
-              { role: 'user', content: 'What is Clarifi?' },
-              { role: 'assistant', content: CLARIFI_INTRO_REPLY, usedScreen: true },
-            ]}
-          />
+        <div className="landing-hero-widget-wrap landing-hero-demo-wrap" data-reveal>
+          <HeroSalesDemo />
         </div>
       </section>
 
