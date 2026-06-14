@@ -73,38 +73,20 @@ export const PRICING_FEATURES = [
   },
 ] as const
 
-const PAYMENT_LINK_ENV: Record<PricingPlanId, Record<BillingInterval, string>> = {
-  pro: {
-    monthly: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_PRO',
-    annual: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_PRO_ANNUAL',
-  },
-  pro_plus: {
-    monthly: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_PRO_PLUS',
-    annual: 'NEXT_PUBLIC_STRIPE_PAYMENT_LINK_PRO_PLUS_ANNUAL',
-  },
+export function billingCheckoutHref(
+  planId: PricingPlanId,
+  interval: BillingInterval = 'monthly',
+): string {
+  const planParam = planId === 'pro_plus' ? 'pro_plus' : 'pro'
+  return `/billing?plan=${planParam}&interval=${interval}`
 }
 
 function planHref(
   planId: PricingPlanId,
   interval: BillingInterval,
 ): { href: string; external: boolean } {
-  const planParam = planId === 'pro_plus' ? 'pro_plus' : 'pro'
-
-  if (interval === 'annual') {
-    return {
-      href: `/billing?plan=${planParam}&interval=annual`,
-      external: false,
-    }
-  }
-
-  const key = PAYMENT_LINK_ENV[planId].monthly
-  const fromEnv = process.env[key]?.trim()
-  if (fromEnv) {
-    return { href: fromEnv, external: true }
-  }
-
   return {
-    href: `/billing?plan=${planParam}&interval=monthly`,
+    href: billingCheckoutHref(planId, interval),
     external: false,
   }
 }

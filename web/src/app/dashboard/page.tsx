@@ -83,10 +83,10 @@ export default async function DashboardPage() {
             Unlimited sessions, AI suggestions, meeting history
           </p>
           <Link
-            href="/billing"
+            href="/billing?plan=pro&interval=monthly"
             className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm hover:bg-white/5"
           >
-            View plans →
+            Start free trial →
           </Link>
         </div>
       </div>

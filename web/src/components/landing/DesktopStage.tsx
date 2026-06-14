@@ -65,24 +65,8 @@ export function DesktopStage({ clarifi, children }: DesktopStageProps) {
             <img src="/menubar/wifi.png" alt="" draggable={false} />
           </span>
           <span className="hero-menubar-control-center">
-            <svg viewBox="0 0 18 14" fill="none" aria-hidden>
-              <rect
-                x="1"
-                y="1.25"
-                width="16"
-                height="4.75"
-                rx="2.375"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <circle cx="4.1" cy="3.625" r="1.2" fill="currentColor" />
-              <path
-                fill="currentColor"
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M1 8.25h8.75A2.375 2.375 0 0112.125 10.625 2.375 2.375 0 0110.5 13H1A2.375 2.375 0 011 10.625 2.375 2.375 0 011 8.25zM9.9 10.625a1.2 1.2 0 11-2.4 0 1.2 1.2 0 012.4 0z"
-              />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/menubar/control-center.png" alt="" draggable={false} />
           </span>
         </div>
       </header>

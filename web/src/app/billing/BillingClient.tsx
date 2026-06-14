@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BillingInterval } from '@/lib/pricing'
 import { annualSavings, maxAnnualSavingsPercent } from '@/lib/pricing'
 
@@ -48,6 +48,7 @@ export default function BillingClient() {
   const [interval, setInterval] = useState<BillingInterval>('monthly')
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const autoCheckoutStarted = useRef(false)
 
   useEffect(() => {
     const fromQuery = searchParams.get('interval')
@@ -56,28 +57,52 @@ export default function BillingClient() {
     }
   }, [searchParams])
 
-  async function startCheckout(plan: 'pro' | 'pro_plus') {
-    setLoadingPlan(plan)
-    setError(null)
+  const startCheckout = useCallback(
+    async (plan: 'pro' | 'pro_plus', billingInterval: BillingInterval = interval) => {
+      setLoadingPlan(plan)
+      setError(null)
 
-    try {
-      const res = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, interval }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.url) {
-        setError(data.error || 'Checkout unavailable — configure Stripe price IDs')
-        return
+      try {
+        const res = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan, interval: billingInterval }),
+        })
+        const data = await res.json()
+
+        if (res.status === 401) {
+          const next = `/billing?plan=${plan}&interval=${billingInterval}`
+          window.location.href = `/sign-in?next=${encodeURIComponent(next)}`
+          return
+        }
+
+        if (!res.ok || !data.url) {
+          setError(data.error || 'Checkout unavailable — configure Stripe price IDs')
+          return
+        }
+        window.location.href = data.url
+      } catch {
+        setError('Network error — try again')
+      } finally {
+        setLoadingPlan(null)
       }
-      window.location.href = data.url
-    } catch {
-      setError('Network error — try again')
-    } finally {
-      setLoadingPlan(null)
-    }
-  }
+    },
+    [interval],
+  )
+
+  useEffect(() => {
+    if (autoCheckoutStarted.current) return
+    if (searchParams.get('checkout') === 'cancelled') return
+
+    const planParam = searchParams.get('plan')
+    if (planParam !== 'pro' && planParam !== 'pro_plus') return
+
+    const intervalParam = searchParams.get('interval')
+    const billingInterval: BillingInterval = intervalParam === 'annual' ? 'annual' : 'monthly'
+
+    autoCheckoutStarted.current = true
+    void startCheckout(planParam, billingInterval)
+  }, [searchParams, startCheckout])
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -162,7 +187,7 @@ export default function BillingClient() {
                 </ul>
                 <button
                   type="button"
-                  onClick={() => startCheckout(plan.id)}
+                  onClick={() => startCheckout(plan.id, interval)}
                   disabled={loadingPlan === plan.id}
                   className="w-full py-3 rounded-xl text-sm font-medium bg-white text-black hover:bg-white/90 disabled:opacity-50"
                 >

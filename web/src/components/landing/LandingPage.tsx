@@ -57,6 +57,7 @@ const PRICING_TIERS = [
     price: '$19',
     period: '/mo',
     tagline: 'Unlimited AI for solo operators',
+    checkoutHref: '/billing?plan=pro&interval=monthly',
     features: [
       '7-day free trial',
       'Unlimited AI responses',
@@ -71,6 +72,7 @@ const PRICING_TIERS = [
     price: '$39',
     period: '/seat/mo',
     tagline: 'Undetectable during screen share',
+    checkoutHref: '/billing?plan=pro_plus&interval=monthly',
     features: [
       '7-day free trial',
       'Everything in Pro',
@@ -331,7 +333,7 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
                   <li key={f}>✓ {f}</li>
                 ))}
               </ul>
-              <Link href="/pricing" className="landing-cta landing-pricing-cta">
+              <Link href={tier.checkoutHref} className="landing-cta landing-pricing-cta">
                 Start free trial
               </Link>
             </div>

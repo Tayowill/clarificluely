@@ -4,7 +4,6 @@ import { isLaunchLive } from '@/lib/waitlist-config'
 /** App surfaces that stay closed until the public launch countdown ends. */
 const PRELAUNCH_BLOCKED_PREFIXES = [
   '/dashboard',
-  '/billing',
   '/sign-in',
   '/sign-up',
   '/desktop/connect',

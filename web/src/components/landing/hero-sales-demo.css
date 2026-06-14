@@ -81,12 +81,11 @@
   opacity: 0.95;
 }
 
-.hero-menubar-control-center svg {
+.hero-menubar-control-center img {
   height: 14px;
   width: auto;
-  aspect-ratio: 18 / 14;
   display: block;
-  overflow: visible;
+  object-fit: contain;
 }
 
 .hero-desktop-scene {
