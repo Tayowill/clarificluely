@@ -38,3 +38,47 @@ export function priceIdForPlan(
     ? process.env.STRIPE_PRICE_PRO_PLUS_ANNUAL?.trim() || null
     : process.env.STRIPE_PRICE_PRO_PLUS?.trim() || null
 }
+
+export type CheckoutSessionInput = {
+  userId: string
+  email?: string | null
+  plan: 'pro' | 'pro_plus'
+  interval: BillingInterval
+  origin: string
+}
+
+export async function createStripeCheckoutSession(
+  input: CheckoutSessionInput,
+): Promise<{ url: string | null; error?: string }> {
+  const stripe = getStripe()
+  if (!stripe) return { url: null, error: 'stripe_not_configured' }
+
+  const priceId = priceIdForPlan(input.plan, input.interval)
+  if (!priceId) return { url: null, error: 'price_not_configured' }
+
+  const origin = input.origin.replace(/\/$/, '')
+
+  const checkout = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${origin}/billing?checkout=success`,
+    cancel_url: `${origin}/billing?checkout=cancelled`,
+    client_reference_id: input.userId,
+    customer_email: input.email ?? undefined,
+    metadata: {
+      userId: input.userId,
+      plan: input.plan,
+      interval: input.interval,
+    },
+    subscription_data: {
+      trial_period_days: 7,
+      metadata: {
+        userId: input.userId,
+        plan: input.plan,
+        interval: input.interval,
+      },
+    },
+  })
+
+  return { url: checkout.url }
+}

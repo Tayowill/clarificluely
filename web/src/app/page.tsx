@@ -1,10 +1,7 @@
 import type { Metadata } from 'next'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { WaitlistPage } from '@/components/waitlist/WaitlistPage'
-import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
-import { AUTH_NEXT_COOKIE } from '@/lib/auth-next'
+import { redirectOAuthCodeIfPresent } from '@/lib/prelaunch-page'
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -38,16 +35,7 @@ type HomeProps = {
 
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams
-  if (typeof params.code === 'string') {
-    const q = new URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      if (typeof value === 'string') q.set(key, value)
-    }
-    const cookieStore = await cookies()
-    const authNext = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
-    const target = authCallbackRedirectPath(q, authNext)
-    if (target) redirect(target)
-  }
+  await redirectOAuthCodeIfPresent(params)
 
   const supabaseConfig = getSupabaseEnv()
 

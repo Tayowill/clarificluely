@@ -12,12 +12,16 @@ import { OverlayDemo, type OverlayDemoHandle } from './OverlayDemo'
 import { MeetingParticipantsMock } from './MeetingParticipantsMock'
 import { ScreenShareCompare } from './ScreenShareCompare'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
+import { PricingCheckoutButton } from '@/components/pricing/PricingCheckoutButton'
+import {
+  MAC_DMG_FILENAME,
+  WIN_EXE_FILENAME,
+  getMacDownloadPath,
+  getWindowsDownloadPath,
+} from '@/lib/downloads'
+import { detectClientPlatform } from '@/lib/platform'
 import '@/components/waitlist/waitlist.css'
 import './landing.css'
-
-type LandingPageProps = {
-  macDownloadUrl: string
-}
 
 const TESTIMONIALS = [
   {
@@ -52,12 +56,12 @@ const TESTIMONIALS = [
 
 const PRICING_TIERS = [
   {
+    id: 'pro' as const,
     name: 'Pro',
     audience: 'Individual',
     price: '$19',
     period: '/mo',
     tagline: 'Unlimited AI for solo operators',
-    checkoutHref: '/billing?plan=pro&interval=monthly',
     features: [
       '7-day free trial',
       'Unlimited AI responses',
@@ -67,12 +71,12 @@ const PRICING_TIERS = [
     featured: false,
   },
   {
+    id: 'pro_plus' as const,
     name: 'Pro+',
     audience: 'Team',
     price: '$39',
     period: '/seat/mo',
     tagline: 'Undetectable during screen share',
-    checkoutHref: '/billing?plan=pro_plus&interval=monthly',
     features: [
       '7-day free trial',
       'Everything in Pro',
@@ -159,20 +163,28 @@ function MoveOverlayDemo({ demoRef }: { demoRef: RefObject<OverlayDemoHandle | n
   )
 }
 
-export function LandingPage({ macDownloadUrl }: LandingPageProps) {
+export function LandingPage() {
   const moveDemoRef = useRef<OverlayDemoHandle>(null)
   const [installOpen, setInstallOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const triggerDownload = useCallback(() => {
+    const platform = detectClientPlatform() ?? 'mac'
+    const path = platform === 'windows' ? getWindowsDownloadPath() : getMacDownloadPath()
+    const filename = platform === 'windows' ? WIN_EXE_FILENAME : MAC_DMG_FILENAME
     const a = document.createElement('a')
-    a.href = macDownloadUrl
-    a.download = 'Clarifi-0.1.0-arm64.dmg'
+    a.href = path
+    a.download = filename
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+    void fetch('/api/customer/platform', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform }),
+    }).catch(() => {})
     setInstallOpen(true)
-  }, [macDownloadUrl])
+  }, [])
 
   const joinWaitlist = useCallback(() => {
     window.location.href = '/#join'
@@ -333,9 +345,13 @@ export function LandingPage({ macDownloadUrl }: LandingPageProps) {
                   <li key={f}>✓ {f}</li>
                 ))}
               </ul>
-              <Link href={tier.checkoutHref} className="landing-cta landing-pricing-cta">
+              <PricingCheckoutButton
+                planId={tier.id}
+                interval="monthly"
+                className="landing-cta landing-pricing-cta"
+              >
                 Start free trial
-              </Link>
+              </PricingCheckoutButton>
             </div>
           ))}
         </div>

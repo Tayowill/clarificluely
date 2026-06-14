@@ -12,7 +12,8 @@ export function pathFromNext(next: string): string {
 }
 
 export function isBillingCheckoutNext(next: string): boolean {
-  return pathFromNext(next) === '/billing'
+  const path = pathFromNext(next)
+  return path === '/billing' || path === '/checkout'
 }
 
 export function isPrelaunchBlockedPath(pathname: string): boolean {
@@ -22,21 +23,56 @@ export function isPrelaunchBlockedPath(pathname: string): boolean {
   )
 }
 
-export function resolvePrelaunchAuthNext(next: string): string {
-  if (isLaunchLive() || !isPrelaunchBlockedPath(next)) return next
+/** Sign-in destinations that create an account (not waitlist-only). */
+export function isAccountAuthNext(next: string): boolean {
+  if (isBillingCheckoutNext(next)) return true
+  return isPrelaunchBlockedPath(next)
+}
+
+export function isWaitlistAuthNext(next: string): boolean {
+  return pathFromNext(next) === '/'
+}
+
+/** Whether /sign-in and /sign-up are reachable before public launch. */
+export function canAccessAuthDuringPrelaunch(next: string, devPreviewLive = false): boolean {
+  if (isLaunchLive(undefined, devPreviewLive)) return true
+  if (devPreviewLive) return true
+  if (isBillingCheckoutNext(next)) return true
+  if (isAccountAuthNext(next)) return true
+  return false
+}
+
+export function resolvePrelaunchAuthNext(next: string, devPreviewLive = false): string {
+  if (isLaunchLive(undefined, devPreviewLive) || !isPrelaunchBlockedPath(next)) return next
   return '/?joined=1'
 }
 
 /** Where to send the user after sign-in during prelaunch. */
-export function resolvePostAuthRedirect(next: string): string {
-  if (isLaunchLive()) return next
+export function resolvePostAuthRedirect(next: string, devPreviewLive = false): string {
+  if (isLaunchLive(undefined, devPreviewLive)) return next
   if (isBillingCheckoutNext(next)) return next
   if (next === '/' || next.startsWith('/?')) return '/?joined=1'
-  return resolvePrelaunchAuthNext(next)
+  if (isPrelaunchBlockedPath(next)) return next
+  return next
 }
 
-export function shouldBlockPrelaunchAccess(pathname: string, userId?: string | null): boolean {
-  if (isLaunchLive()) return false
+/** OAuth callback: waitlist join vs normal account sign-in. */
+export function isWaitlistOAuthFlow(
+  next: string,
+  devPreviewLive = false,
+): boolean {
+  if (isBillingCheckoutNext(next)) return false
+  if (isAccountAuthNext(next)) return false
+  if (isLaunchLive(undefined, devPreviewLive)) return isWaitlistAuthNext(next)
+  return isWaitlistAuthNext(next)
+}
+
+export function shouldBlockPrelaunchAccess(
+  pathname: string,
+  userId?: string | null,
+  devPreviewLive = false,
+): boolean {
+  if (isLaunchLive(undefined, devPreviewLive)) return false
   if (
     process.env.NODE_ENV === 'development' &&
     (pathname === '/desktop/connect' || pathname.startsWith('/desktop/connect/'))

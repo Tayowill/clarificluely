@@ -10,10 +10,9 @@ export default function robots(): MetadataRoute.Robots {
       allow: ['/', '/blog', '/privacy', '/terms', '/subprocessors'],
       disallow: [
         '/preview',
-        '/prelaunch',
-        '/live',
         '/dashboard',
         '/billing',
+        '/checkout',
         '/sign-in',
         '/sign-up',
         '/desktop/',

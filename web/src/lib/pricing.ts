@@ -13,8 +13,6 @@ export type PricingPlan = {
   badge?: string
   tagline: string
   cta: string
-  href: string
-  external?: boolean
   features: string[]
 }
 
@@ -73,24 +71,6 @@ export const PRICING_FEATURES = [
   },
 ] as const
 
-export function billingCheckoutHref(
-  planId: PricingPlanId,
-  interval: BillingInterval = 'monthly',
-): string {
-  const planParam = planId === 'pro_plus' ? 'pro_plus' : 'pro'
-  return `/billing?plan=${planParam}&interval=${interval}`
-}
-
-function planHref(
-  planId: PricingPlanId,
-  interval: BillingInterval,
-): { href: string; external: boolean } {
-  return {
-    href: billingCheckoutHref(planId, interval),
-    external: false,
-  }
-}
-
 export function getPricingPlans(interval: BillingInterval = 'monthly'): PricingPlan[] {
   const isAnnual = interval === 'annual'
 
@@ -105,7 +85,6 @@ export function getPricingPlans(interval: BillingInterval = 'monthly'): PricingP
       savingsNote: isAnnual ? annualSavings('pro').label : undefined,
       tagline: 'Unlimited access for solo operators.',
       cta: 'Start 7-day free trial',
-      ...planHref('pro', interval),
       features: [
         '7-day free trial',
         'Unlimited AI responses',
@@ -126,7 +105,6 @@ export function getPricingPlans(interval: BillingInterval = 'monthly'): PricingP
       savingsNote: isAnnual ? annualSavings('pro_plus').label : undefined,
       tagline: 'Undetectable during screen share for teams.',
       cta: 'Start 7-day free trial',
-      ...planHref('pro_plus', interval),
       features: [
         '7-day free trial',
         'Everything in Pro',

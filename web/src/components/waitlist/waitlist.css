@@ -289,6 +289,12 @@
   color: #94a3b8;
 }
 
+.waitlist-download-cta {
+  width: 100%;
+  max-width: 20rem;
+  margin: 0 auto;
+}
+
 .waitlist-footer {
   margin-top: 2rem;
   font-size: 0.8rem;

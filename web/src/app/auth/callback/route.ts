@@ -5,8 +5,12 @@ import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
-import { isBillingCheckoutNext, resolvePostAuthRedirect } from '@/lib/prelaunch'
-import { isLaunchLive } from '@/lib/waitlist-config'
+import { DEV_LAUNCH_PREVIEW_COOKIE, resolveDevLaunchPreview } from '@/lib/launch-preview'
+import {
+  isBillingCheckoutNext,
+  isWaitlistOAuthFlow,
+  resolvePostAuthRedirect,
+} from '@/lib/prelaunch'
 import { joinWaitlist } from '@/lib/waitlist'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +19,6 @@ function buildRedirect(request: Request, path: string) {
   const response = NextResponse.redirect(new URL(path, request.url))
   response.cookies.set(AUTH_NEXT_COOKIE, '', { path: '/', maxAge: 0 })
   return response
-}
-
-function isWaitlistRedirect(next: string): boolean {
-  return next === '/'
 }
 
 function resolveNextParam(
@@ -36,14 +36,17 @@ export async function GET(request: Request) {
   const cookieStore = await cookies()
   const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
   const rawNext = resolveNextParam(searchParams, authNextCookie)
+  const devPreviewLive = resolveDevLaunchPreview(
+    searchParams,
+    cookieStore.get(DEV_LAUNCH_PREVIEW_COOKIE)?.value ?? null,
+  )
   const billingCheckout = isBillingCheckoutNext(rawNext)
-  const waitlistFlow =
-    (isWaitlistRedirect(rawNext) || !isLaunchLive()) && !billingCheckout
+  const waitlistFlow = isWaitlistOAuthFlow(rawNext, devPreviewLive)
   const successPath = billingCheckout
     ? rawNext
     : waitlistFlow
       ? '/?joined=1'
-      : resolvePostAuthRedirect(rawNext)
+      : resolvePostAuthRedirect(rawNext, devPreviewLive)
 
   if (!code || !getSupabaseEnv()) {
     return buildRedirect(request, '/sign-in?error=auth')

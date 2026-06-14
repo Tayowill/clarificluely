@@ -3,9 +3,14 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveAuthNext } from '@/lib/auth-next'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
+import {
+  DEV_LAUNCH_PREVIEW_COOKIE,
+  resolveDevLaunchPreview,
+} from '@/lib/launch-preview'
+import { applyDevLaunchPreviewCookies } from '@/lib/launch-preview-server'
 import { resolvePostAuthRedirect, shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
 import { isPublicPath } from '@/lib/protected-routes'
-import { shouldBlockLivePreview } from '@/lib/site-preview'
+import { CANONICAL_SITE_HOST, shouldRedirectToCanonicalHost } from '@/lib/site-url'
 import { isLaunchLive } from '@/lib/waitlist-config'
 
 function getSupabaseEnv() {
@@ -20,13 +25,28 @@ function getSupabaseEnv() {
 
 export default async function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
+  const host = request.headers.get('host') ?? ''
 
-  if (pathname.startsWith('/preview')) {
-    return NextResponse.redirect(new URL('/live', request.url))
+  if (shouldRedirectToCanonicalHost(host)) {
+    const canonical = request.nextUrl.clone()
+    canonical.hostname = CANONICAL_SITE_HOST
+    canonical.protocol = 'https:'
+    return NextResponse.redirect(canonical, 308)
   }
 
-  if (pathname === '/live' && shouldBlockLivePreview(request.nextUrl.hostname)) {
+  if (
+    pathname === '/live' ||
+    pathname === '/prelaunch'
+  ) {
     return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (pathname.startsWith('/preview')) {
+    const target =
+      process.env.NODE_ENV === 'development'
+        ? new URL('/?preview=live', request.url)
+        : new URL('/', request.url)
+    return NextResponse.redirect(target)
   }
 
   if (searchParams.get('code') && pathname !== '/auth/callback') {
@@ -50,6 +70,15 @@ export default async function proxy(request: NextRequest) {
   }
 
   let response = NextResponse.next({ request })
+  const devPreviewLive = resolveDevLaunchPreview(
+    searchParams,
+    request.cookies.get(DEV_LAUNCH_PREVIEW_COOKIE)?.value ?? null,
+  )
+
+  if (process.env.NODE_ENV === 'development') {
+    applyDevLaunchPreviewCookies(response, searchParams.get('preview'))
+  }
+
   const env = getSupabaseEnv()
 
   if (env) {
@@ -74,7 +103,7 @@ export default async function proxy(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (shouldBlockPrelaunchAccess(pathname, user?.id)) {
+    if (shouldBlockPrelaunchAccess(pathname, user?.id, devPreviewLive)) {
       const home = new URL('/', request.url)
       if (user) home.searchParams.set('joined', '1')
       const redirectResponse = NextResponse.redirect(home)
@@ -87,7 +116,9 @@ export default async function proxy(request: NextRequest) {
     if (pathname === '/sign-in' || pathname === '/sign-up') {
       if (user) {
         const next = resolveAuthNext(searchParams.get('next'), '/dashboard')
-        const dest = isLaunchLive() ? next : resolvePostAuthRedirect(next)
+        const dest = isLaunchLive(undefined, devPreviewLive)
+          ? next
+          : resolvePostAuthRedirect(next, devPreviewLive)
         const redirectResponse = NextResponse.redirect(new URL(dest, request.url))
         response.cookies.getAll().forEach((cookie) => {
           redirectResponse.cookies.set(cookie)
@@ -100,6 +131,7 @@ export default async function proxy(request: NextRequest) {
       if (!user) {
         const signIn = new URL('/sign-in', request.url)
         signIn.searchParams.set('next', `${pathname}${request.nextUrl.search}`)
+        if (devPreviewLive) signIn.searchParams.set('preview', 'live')
         const redirectResponse = NextResponse.redirect(signIn)
         response.cookies.getAll().forEach((cookie) => {
           redirectResponse.cookies.set(cookie)
@@ -114,7 +146,7 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml|txt)).*)',
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml|txt|dmg|exe)).*)',
     '/(api|trpc)(.*)',
   ],
 }

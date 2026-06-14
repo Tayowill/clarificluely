@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { MarketingNav } from '@/components/marketing/MarketingNav'
+import { PricingCheckoutButton } from '@/components/pricing/PricingCheckoutButton'
 import { type BillingInterval, PRICING_FEATURES, getPricingPlans, maxAnnualSavingsPercent } from '@/lib/pricing'
 import '@/components/landing/landing.css'
 import './pricing.css'
@@ -120,20 +120,13 @@ export function PricingPage() {
                 ) : null}
               </div>
 
-              {plan.external ? (
-                <a
-                  href={plan.href}
-                  className="pricing-card-cta"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {plan.cta}
-                </a>
-              ) : (
-                <Link href={plan.href} className="pricing-card-cta">
-                  {plan.cta}
-                </Link>
-              )}
+              <PricingCheckoutButton
+                planId={plan.id}
+                interval={billing}
+                className="pricing-card-cta"
+              >
+                {plan.cta}
+              </PricingCheckoutButton>
 
               <p className="pricing-card-tagline">{plan.tagline}</p>
 

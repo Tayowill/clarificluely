@@ -3,6 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
+import { devPreviewHref } from '@/lib/launch-preview'
+import { useLaunchCountdown } from '@/hooks/useLaunchCountdown'
 import '@/components/landing/landing.css'
 
 type MarketingNavProps = {
@@ -12,6 +14,8 @@ type MarketingNavProps = {
 
 export function MarketingNav({ active, showBack = false }: MarketingNavProps) {
   const [scrolled, setScrolled] = useState(false)
+  const countdown = useLaunchCountdown()
+  const isLive = countdown?.isLive ?? false
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -70,13 +74,19 @@ export function MarketingNav({ active, showBack = false }: MarketingNavProps) {
             Pricing
           </Link>
         </div>
-        <button
-          type="button"
-          className="landing-cta landing-nav-cta"
-          onClick={scrollToJoin}
-        >
-          Join the waitlist
-        </button>
+        {isLive ? (
+          <Link href={devPreviewHref('/dashboard')} className="landing-cta landing-nav-cta">
+            Dashboard
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="landing-cta landing-nav-cta"
+            onClick={scrollToJoin}
+          >
+            Join the waitlist
+          </button>
+        )}
       </div>
     </nav>
   )

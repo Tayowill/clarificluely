@@ -1,5 +1,16 @@
 const DEFAULT_SITE_URL = 'https://www.clarifiapp.com'
 
+export const CANONICAL_SITE_HOST = 'www.clarifiapp.com'
+
+export function isClarifiProductionHost(hostname: string): boolean {
+  return hostname === 'clarifiapp.com' || hostname === 'www.clarifiapp.com'
+}
+
+/** Redirect bare domain to www so OAuth PKCE cookies stay on one origin. */
+export function shouldRedirectToCanonicalHost(host: string): boolean {
+  return host === 'clarifiapp.com'
+}
+
 /** Canonical origin for OAuth redirects — avoids www/non-www PKCE cookie mismatches. */
 export function getSiteOrigin(requestOrigin?: string): string {
   const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '')
@@ -7,7 +18,7 @@ export function getSiteOrigin(requestOrigin?: string): string {
 
   if (typeof window !== 'undefined') {
     const { hostname, origin } = window.location
-    if (hostname === 'clarifiapp.com' || hostname === 'www.clarifiapp.com') {
+    if (isClarifiProductionHost(hostname)) {
       return DEFAULT_SITE_URL
     }
     return origin
@@ -16,7 +27,7 @@ export function getSiteOrigin(requestOrigin?: string): string {
   if (requestOrigin) {
     try {
       const host = new URL(requestOrigin).hostname
-      if (host === 'clarifiapp.com' || host === 'www.clarifiapp.com') {
+      if (isClarifiProductionHost(host)) {
         return DEFAULT_SITE_URL
       }
       return requestOrigin.replace(/\/$/, '')
@@ -30,9 +41,5 @@ export function getSiteOrigin(requestOrigin?: string): string {
 
 export function authCallbackUrl(next = '/', origin?: string): string {
   const safeNext = next.startsWith('/') ? next : '/'
-  // Match the current browser host so PKCE verifier cookies stay on the same origin.
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`
-  }
   return `${getSiteOrigin(origin)}/auth/callback?next=${encodeURIComponent(safeNext)}`
 }

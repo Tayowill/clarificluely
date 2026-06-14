@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { checkoutHref } from '@/lib/checkout'
 import type { BillingInterval } from '@/lib/pricing'
 import { annualSavings, maxAnnualSavingsPercent } from '@/lib/pricing'
 
@@ -48,7 +49,7 @@ export default function BillingClient() {
   const [interval, setInterval] = useState<BillingInterval>('monthly')
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const autoCheckoutStarted = useRef(false)
+  const checkoutStatus = searchParams.get('checkout')
 
   useEffect(() => {
     const fromQuery = searchParams.get('interval')
@@ -71,8 +72,7 @@ export default function BillingClient() {
         const data = await res.json()
 
         if (res.status === 401) {
-          const next = `/billing?plan=${plan}&interval=${billingInterval}`
-          window.location.href = `/sign-in?next=${encodeURIComponent(next)}`
+          window.location.href = `/sign-in?next=${encodeURIComponent(checkoutHref(plan, billingInterval))}`
           return
         }
 
@@ -90,28 +90,14 @@ export default function BillingClient() {
     [interval],
   )
 
-  useEffect(() => {
-    if (autoCheckoutStarted.current) return
-    if (searchParams.get('checkout') === 'cancelled') return
-
-    const planParam = searchParams.get('plan')
-    if (planParam !== 'pro' && planParam !== 'pro_plus') return
-
-    const intervalParam = searchParams.get('interval')
-    const billingInterval: BillingInterval = intervalParam === 'annual' ? 'annual' : 'monthly'
-
-    autoCheckoutStarted.current = true
-    void startCheckout(planParam, billingInterval)
-  }, [searchParams, startCheckout])
-
   return (
     <main className="min-h-screen bg-black text-white">
       <nav className="flex items-center justify-between px-8 py-6 border-b border-white/10">
-        <Link href="/dashboard" className="text-xl font-bold">
+        <Link href="/pricing" className="text-xl font-bold">
           Clarifi
         </Link>
-        <Link href="/dashboard" className="text-sm text-white/40 hover:text-white">
-          ← Back to dashboard
+        <Link href="/pricing" className="text-sm text-white/40 hover:text-white">
+          ← Back to pricing
         </Link>
       </nav>
 
@@ -121,6 +107,18 @@ export default function BillingClient() {
           Start with a 7-day free trial. Clarifi runs through our secure API proxy — you subscribe
           here, not with your own keys.
         </p>
+
+        {checkoutStatus === 'success' && (
+          <p className="text-sm text-emerald-400 mb-6 border border-emerald-400/30 rounded-lg p-4" role="status">
+            Payment received — thanks for subscribing. Your plan will activate shortly.
+          </p>
+        )}
+
+        {checkoutStatus === 'cancelled' && (
+          <p className="text-sm text-white/60 mb-6 border border-white/10 rounded-lg p-4" role="status">
+            Checkout cancelled. Pick a plan below when you&apos;re ready.
+          </p>
+        )}
 
         <div className="inline-flex p-1 mb-10 rounded-full border border-white/15 bg-white/5">
           <button

@@ -5,9 +5,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { ClarifiBentoSection } from '@/components/landing/ClarifiBentoSection'
 import { FaqSection } from '@/components/landing/FaqSection'
 import { HeroSalesDemo } from '@/components/landing/HeroSalesDemo'
+import { DownloadClarifi } from '@/components/DownloadClarifi'
+import { useLaunchCountdown } from '@/hooks/useLaunchCountdown'
 import { createClient } from '@/lib/supabase/client'
 import type { SupabasePublicConfig } from '@/lib/supabase/env'
-import { getLaunchCountdown, WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
+import { WAITLIST_LAUNCH_AT } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
 import { fireWaitlistConfetti } from '@/lib/waitlist-confetti'
 import { authCallbackUrl } from '@/lib/site-url'
@@ -84,20 +86,14 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
   const signupEnabled = activeConfig !== null
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
-  const [countdown, setCountdown] = useState<ReturnType<typeof getLaunchCountdown> | null>(null)
+  const countdown = useLaunchCountdown()
+  const isLive = countdown?.isLive ?? false
   const [status, setStatus] = useState<'idle' | 'loading' | 'email_sent' | 'joined' | 'error'>(
     'idle',
   )
   const [message, setMessage] = useState('')
   const scrollToJoin = useCallback(() => {
     document.getElementById('join')?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
-
-  useEffect(() => {
-    const tick = () => setCountdown(getLaunchCountdown())
-    tick()
-    const id = window.setInterval(tick, 1000)
-    return () => window.clearInterval(id)
   }, [])
 
   useEffect(() => {
@@ -177,7 +173,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
       return
     }
 
-    if (!signupEnabled) return
+    if (!signupEnabled || isLive) return
 
     const supabase = createClient(activeConfig)
     if (!supabase) return
@@ -186,7 +182,7 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
         void completeJoin()
       }
     })
-  }, [searchParams, completeJoin, scrollToJoin, signupEnabled, activeConfig, configChecked])
+  }, [searchParams, completeJoin, scrollToJoin, signupEnabled, activeConfig, configChecked, isLive])
 
   const handleEmailJoin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -260,7 +256,11 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
             Clarifi provides real-time assistance on every sales call. Invisible on screen
             share.
           </p>
-          <JoinWaitlistButton onClick={scrollToJoin} large />
+          {isLive ? (
+            <DownloadClarifi variant="compact" className="landing-cta landing-cta-large" />
+          ) : (
+            <JoinWaitlistButton onClick={scrollToJoin} large />
+          )}
         </div>
 
         <div className="landing-hero-widget-wrap landing-hero-demo-wrap" data-reveal>
@@ -276,12 +276,19 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
 
       <section className="waitlist-join" id="join" data-reveal>
         <div className="waitlist-join-inner">
-          <p className="waitlist-eyebrow">Launching soon</p>
+          <p className="waitlist-eyebrow">{isLive ? 'Available now' : 'Launching soon'}</p>
 
-          {countdown?.isLive ? (
-            <p className="waitlist-launch-date">
-              <strong>We&apos;re live.</strong> Check your email for next steps.
-            </p>
+          {isLive ? (
+            <>
+              <h2 className="waitlist-title">Download Clarifi</h2>
+              <p className="waitlist-sub">
+                Install for your platform, then sign in on the web to connect your account.
+              </p>
+              <DownloadClarifi
+                variant="compact"
+                className="waitlist-btn waitlist-btn-primary waitlist-download-cta"
+              />
+            </>
           ) : (
             <>
               <div className="waitlist-countdown" aria-live="polite">
@@ -311,53 +318,53 @@ export function WaitlistPage({ supabaseConfig, siteOrigin }: WaitlistPageProps) 
               <p className="waitlist-launch-date">
                 Launching <strong>{LAUNCH_LABEL}</strong>
               </p>
+
+              {!configChecked && (
+                <p className="waitlist-status info">Loading sign-up…</p>
+              )}
+
+              {configChecked && !signupEnabled && (
+                <p className="waitlist-status info">
+                  Waitlist sign-up is temporarily unavailable. Please try again later.
+                </p>
+              )}
+
+              {signupEnabled && status !== 'joined' && status !== 'email_sent' && (
+                <div className="waitlist-form">
+                  <form className="waitlist-email-row" onSubmit={(e) => void handleEmailJoin(e)}>
+                    <input
+                      type="email"
+                      className="waitlist-input"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                      disabled={status === 'loading'}
+                    />
+                    <button
+                      type="submit"
+                      className="waitlist-btn waitlist-btn-primary"
+                      disabled={status === 'loading'}
+                    >
+                      Join the waitlist
+                    </button>
+                  </form>
+
+                  <div className="waitlist-divider">or</div>
+
+                  <button
+                    type="button"
+                    className="waitlist-btn waitlist-btn-google"
+                    onClick={() => void handleGoogleJoin()}
+                    disabled={status === 'loading'}
+                  >
+                    <GoogleIcon />
+                    Continue with Google
+                  </button>
+                </div>
+              )}
             </>
-          )}
-
-          {!configChecked && (
-            <p className="waitlist-status info">Loading sign-up…</p>
-          )}
-
-          {configChecked && !signupEnabled && (
-            <p className="waitlist-status info">
-              Waitlist sign-up is temporarily unavailable. Please try again later.
-            </p>
-          )}
-
-          {signupEnabled && status !== 'joined' && status !== 'email_sent' && (
-            <div className="waitlist-form">
-              <form className="waitlist-email-row" onSubmit={(e) => void handleEmailJoin(e)}>
-                <input
-                  type="email"
-                  className="waitlist-input"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  disabled={status === 'loading'}
-                />
-                <button
-                  type="submit"
-                  className="waitlist-btn waitlist-btn-primary"
-                  disabled={status === 'loading'}
-                >
-                  Join the waitlist
-                </button>
-              </form>
-
-              <div className="waitlist-divider">or</div>
-
-              <button
-                type="button"
-                className="waitlist-btn waitlist-btn-google"
-                onClick={() => void handleGoogleJoin()}
-                disabled={status === 'loading'}
-              >
-                <GoogleIcon />
-                Continue with Google
-              </button>
-            </div>
           )}
 
           {message && !(searchParams.get('error') === 'config' && signupEnabled) && (

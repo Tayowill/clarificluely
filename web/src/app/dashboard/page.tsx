@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { DownloadClarifi } from '@/components/DownloadClarifi'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { DesktopConnect } from '@/components/DesktopConnect'
 import { getServerUser } from '@/lib/auth-server'
-import { getMacDownloadUrl, MAC_DMG_FILENAME } from '@/lib/downloads'
 import { PLAN_LIMITS } from '@/lib/plans'
+import { getServerDevLaunchPreview } from '@/lib/launch-preview-server'
 import { shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
 import { getUsageStats } from '@/lib/usage'
 
@@ -16,13 +17,13 @@ export const metadata = {
 export default async function DashboardPage() {
   const user = await getServerUser()
   if (!user) redirect('/sign-in?next=/dashboard')
-  if (shouldBlockPrelaunchAccess('/dashboard', user.id)) redirect('/?joined=1')
+  const devPreviewLive = await getServerDevLaunchPreview()
+  if (shouldBlockPrelaunchAccess('/dashboard', user.id, devPreviewLive)) redirect('/?joined=1')
 
   const stats = await getUsageStats(user.id)
   const limitLabel = Number.isFinite(stats.limit)
     ? `${stats.used} / ${stats.limit}`
     : `${stats.used} (unlimited)`
-  const macDownloadUrl = getMacDownloadUrl()
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'there'
 
   return (
@@ -57,24 +58,17 @@ export default async function DashboardPage() {
         <div className="p-6 border border-white/10 rounded-2xl mb-6">
           <h2 className="font-semibold mb-1">Download Clarifi</h2>
           <p className="text-sm text-white/50 mb-4">
-            Install the desktop app, then use Open Clarifi Desktop above to connect automatically.
-            On first launch, right-click Clarifi in Applications and choose Open, then confirm Open in the security dialog.
+            Install the desktop app for your platform, then use Open Clarifi Desktop above to
+            connect automatically. On macOS first launch, right-click Clarifi in Applications and
+            choose Open, then confirm Open in the security dialog.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href={macDownloadUrl}
-              download={MAC_DMG_FILENAME}
-              className="inline-block bg-white text-black px-6 py-2 rounded-lg text-sm font-medium hover:bg-white/90"
-            >
-              Download for macOS
-            </a>
-            <Link
-              href="/desktop/connect"
-              className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm hover:bg-white/5"
-            >
-              Connect after install →
-            </Link>
-          </div>
+          <DownloadClarifi variant="dashboard" />
+          <Link
+            href="/desktop/connect"
+            className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm hover:bg-white/5 mt-3"
+          >
+            Connect after install →
+          </Link>
         </div>
 
         <div className="p-6 border border-white/10 rounded-2xl">
@@ -83,7 +77,7 @@ export default async function DashboardPage() {
             Unlimited sessions, AI suggestions, meeting history
           </p>
           <Link
-            href="/billing?plan=pro&interval=monthly"
+            href="/billing"
             className="inline-block border border-white/20 px-6 py-2 rounded-lg text-sm hover:bg-white/5"
           >
             Start free trial →
