@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveAuthNext } from '@/lib/auth-next'
 import { authCallbackRedirectPath } from '@/lib/auth-callback-redirect'
-import { shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
+import { resolvePostAuthRedirect, shouldBlockPrelaunchAccess } from '@/lib/prelaunch'
 import { isPublicPath } from '@/lib/protected-routes'
 import { shouldBlockLivePreview } from '@/lib/site-preview'
 import { isLaunchLive } from '@/lib/waitlist-config'
@@ -86,9 +86,8 @@ export default async function proxy(request: NextRequest) {
 
     if (pathname === '/sign-in' || pathname === '/sign-up') {
       if (user) {
-        const dest = isLaunchLive()
-          ? resolveAuthNext(searchParams.get('next'), '/dashboard')
-          : '/?joined=1'
+        const next = resolveAuthNext(searchParams.get('next'), '/dashboard')
+        const dest = isLaunchLive() ? next : resolvePostAuthRedirect(next)
         const redirectResponse = NextResponse.redirect(new URL(dest, request.url))
         response.cookies.getAll().forEach((cookie) => {
           redirectResponse.cookies.set(cookie)

@@ -5,7 +5,7 @@ import { isCreatorUser } from '@/lib/creator'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { getSupabaseEnv } from '@/lib/supabase/env'
 import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
-import { resolvePrelaunchAuthNext } from '@/lib/prelaunch'
+import { isBillingCheckoutNext, resolvePostAuthRedirect } from '@/lib/prelaunch'
 import { isLaunchLive } from '@/lib/waitlist-config'
 import { joinWaitlist } from '@/lib/waitlist'
 
@@ -36,8 +36,14 @@ export async function GET(request: Request) {
   const cookieStore = await cookies()
   const authNextCookie = cookieStore.get(AUTH_NEXT_COOKIE)?.value ?? null
   const rawNext = resolveNextParam(searchParams, authNextCookie)
-  const waitlistFlow = isWaitlistRedirect(rawNext) || !isLaunchLive()
-  const successPath = waitlistFlow ? '/?joined=1' : resolvePrelaunchAuthNext(rawNext)
+  const billingCheckout = isBillingCheckoutNext(rawNext)
+  const waitlistFlow =
+    (isWaitlistRedirect(rawNext) || !isLaunchLive()) && !billingCheckout
+  const successPath = billingCheckout
+    ? rawNext
+    : waitlistFlow
+      ? '/?joined=1'
+      : resolvePostAuthRedirect(rawNext)
 
   if (!code || !getSupabaseEnv()) {
     return buildRedirect(request, '/sign-in?error=auth')

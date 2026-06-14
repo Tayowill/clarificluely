@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { AuthForm } from '@/components/auth/AuthForm'
 import { AuthRedirect } from '@/components/auth/AuthRedirect'
 import { getServerUser } from '@/lib/auth-server'
+import { isBillingCheckoutNext, resolvePostAuthRedirect } from '@/lib/prelaunch'
 import { isLaunchLive } from '@/lib/waitlist-config'
 import '@/components/auth/auth.css'
 
@@ -19,10 +20,12 @@ export const metadata = {
 export default async function SignUpPage({ searchParams }: PageProps) {
   const { next, error } = await searchParams
   const redirectNext = next?.startsWith('/') ? next : '/dashboard'
-  if (!isLaunchLive()) redirect('/')
+  if (!isLaunchLive() && !isBillingCheckoutNext(redirectNext)) redirect('/')
 
   const user = await getServerUser()
-  if (user) redirect('/?joined=1')
+  if (user) {
+    redirect(isLaunchLive() ? redirectNext : resolvePostAuthRedirect(redirectNext))
+  }
 
   return (
     <>
